@@ -283,11 +283,15 @@ def _make_temp_label(text: str) -> cq.Workplane:
     The text is positioned on the back face (Y = TIER_WIDTH) of the tier,
     engraved into the surface.  ``Workplane("XZ")`` normal is **-Y**, so
     positive *distance* extrudes in -Y (into the tier from the back face).
+
+    The text is mirrored in X (via ``.mirror("YZ")``) so that it reads
+    correctly when viewed from the back (+Y direction).
     """
+    x_center = TIER_LENGTH - TEMP_LABEL_H_OFFSET
     return (
         cq.Workplane("XZ")
         .transformed(offset=cq.Vector(
-            TIER_LENGTH - TEMP_LABEL_H_OFFSET,
+            x_center,
             TIER_HEIGHT - TEMP_LABEL_V_OFFSET,
             0,
         ))
@@ -298,28 +302,33 @@ def _make_temp_label(text: str) -> cq.Workplane:
             halign="center",
             valign="center",
         )
+        .mirror("YZ", basePointVector=(x_center, 0, 0))
         .translate(cq.Vector(0, TIER_WIDTH, 0))
     )
 
 
 def _make_overhang_label_45() -> cq.Workplane:
     """Create the '45' degree label on the first tier."""
+    x_center = 8
     return (
         cq.Workplane("XZ")
-        .transformed(offset=cq.Vector(8, TIER_HEIGHT - 4, 0))
+        .transformed(offset=cq.Vector(x_center, TIER_HEIGHT - 4, 0))
         .text("45", fontsize=OH_LABEL_SIZE, distance=OH_LABEL_DEPTH,
               halign="center", valign="center")
+        .mirror("YZ", basePointVector=(x_center, 0, 0))
         .translate(cq.Vector(0, TIER_WIDTH, 0))
     )
 
 
 def _make_overhang_label_35() -> cq.Workplane:
     """Create the '35' degree label on the first tier."""
+    x_center = TIER_LENGTH - 11
     return (
         cq.Workplane("XZ")
-        .transformed(offset=cq.Vector(TIER_LENGTH - 11, TIER_HEIGHT - 3, 0))
+        .transformed(offset=cq.Vector(x_center, TIER_HEIGHT - 3, 0))
         .text("35", fontsize=OH_LABEL_SIZE, distance=OH_LABEL_DEPTH,
               halign="center", valign="center")
+        .mirror("YZ", basePointVector=(x_center, 0, 0))
         .translate(cq.Vector(0, TIER_WIDTH, 0))
     )
 
