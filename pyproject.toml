@@ -1,0 +1,27 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "filament-calibrator"
+version = "0.1.0"
+description = "Automated filament temperature tower calibration for Prusa 3D printers"
+readme = "README.md"
+license = "GPL-3.0-only"
+authors = [
+    { name = "Hyiger" },
+]
+requires-python = ">=3.10"
+dependencies = [
+    "cadquery>=2.4",
+    "gcode-lib>=1.7.0",
+]
+
+[project.scripts]
+temperature-tower = "filament_calibrator.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/filament_calibrator"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
