@@ -6,7 +6,8 @@ printer-url = "http://192.168.1.100"
 api-key = "your-prusalink-api-key"
 
 # Slicer setup
-prusaslicer-path = "/usr/bin/prusa-slicer"
+# prusaslicer-path is only needed if PrusaSlicer is not on your PATH
+# prusaslicer-path = "/usr/bin/prusa-slicer"
 config-ini = "/path/to/printer-profile.ini"
 
 # Defaults

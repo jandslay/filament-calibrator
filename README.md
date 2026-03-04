@@ -25,6 +25,22 @@ This pulls all Python dependencies from PyPI automatically:
 [gcode-lib](https://github.com/hyiger/gcode-lib) (>= 1.0.0) for G-code
 manipulation.
 
+### Externally-managed Python (macOS / Homebrew / Linux)
+
+On systems where the system Python is externally managed (macOS with Homebrew,
+recent Ubuntu/Fedora, etc.), `pip install` will refuse to install into the
+global environment. Use a virtual environment instead:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+```
+
+The `temperature-tower` command is available whenever the venv is active.
+To reactivate later, run `source .venv/bin/activate` from the project
+directory.
+
 ## Quick Start
 
 Generate and upload a PLA temperature tower with preset defaults:
@@ -57,8 +73,9 @@ Then edit it with your printer and slicer details:
 printer-url = "http://192.168.1.100"
 api-key = "your-prusalink-api-key"
 
-# Slicer setup
-prusaslicer-path = "/usr/bin/prusa-slicer"
+# Slicer setup (prusaslicer-path is only needed if PrusaSlicer is not
+# installed in a standard location — the tool auto-detects it on PATH)
+# prusaslicer-path = "/usr/bin/prusa-slicer"
 config-ini = "/path/to/printer-profile.ini"
 
 # Defaults
@@ -66,7 +83,10 @@ filament-type = "PLA"
 output-dir = "./output"
 ```
 
-All keys are optional — include only what you need.
+All keys are optional — include only what you need. In particular,
+`prusaslicer-path` can be omitted if PrusaSlicer is installed in a standard
+location (e.g. `/usr/bin/prusa-slicer`, `/Applications/PrusaSlicer.app`, or
+anywhere on your `PATH`).
 
 ### Config file locations
 
