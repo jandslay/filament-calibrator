@@ -6,14 +6,23 @@ Generates a parametric temperature tower model, slices it with PrusaSlicer,
 injects per-tier temperature changes into the G-code, and optionally uploads
 the result to your printer via PrusaLink.
 
+## Prerequisites
+
+- **Python 3.10+**
+- **PrusaSlicer** installed and available on your `PATH` (or provide
+  `--prusaslicer-path`). Download from
+  [prusa3d.com](https://www.prusa3d.com/page/prusaslicer_424/).
+- A Prusa printer with **PrusaLink** enabled (only needed for uploading).
+
 ## Installation
 
 ```bash
 pip install -e .
 ```
 
-Requires [CadQuery](https://cadquery.readthedocs.io/) for model generation and
-[gcode-lib](https://github.com/hyiger/gcode-lib) (>= 1.7.0) for G-code
+This pulls all Python dependencies from PyPI automatically:
+[CadQuery](https://cadquery.readthedocs.io/) for model generation and
+[gcode-lib](https://github.com/hyiger/gcode-lib) (>= 1.0.0) for G-code
 manipulation.
 
 ## Quick Start
