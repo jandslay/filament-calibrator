@@ -8,7 +8,7 @@ api-key = "your-prusalink-api-key"
 # Slicer setup
 # prusaslicer-path is only needed if PrusaSlicer is not on your PATH
 # prusaslicer-path = "/usr/bin/prusa-slicer"
-config-ini = "/path/to/printer-profile.ini"
+# config-ini = "/path/to/printer-profile.ini"
 
 # Bed centre in mm (X,Y) — used to position the model on the print bed.
 # Default is 125,105 (Prusa MK-series 250×210 mm bed).

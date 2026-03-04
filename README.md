@@ -104,7 +104,7 @@ api-key = "your-prusalink-api-key"
 # Slicer setup (prusaslicer-path is only needed if PrusaSlicer is not
 # installed in a standard location — the tool auto-detects it on PATH)
 # prusaslicer-path = "/usr/bin/prusa-slicer"
-config-ini = "/path/to/printer-profile.ini"
+# config-ini = "/path/to/printer-profile.ini"
 
 # Bed centre in mm — default is 125,105 (Prusa MK-series).
 # For Prusa MINI, use 90,90.
@@ -192,7 +192,7 @@ must be evenly divisible by `--temp-step`.
 | `--fan-speed` | from preset | Fan speed (0-100%) |
 | `--config-ini` | | PrusaSlicer `.ini` config file |
 | `--prusaslicer-path` | auto-detect | Path to PrusaSlicer executable |
-| `--bed-center` | `125,105` | Bed centre as X,Y in mm (see below) |
+| `--bed-center` | `125,105` | Bed centre as X,Y in mm |
 | `--extra-slicer-args` | | Additional PrusaSlicer CLI args (must be last) |
 
 ### Printer Options
@@ -211,14 +211,15 @@ must be evenly divisible by `--temp-step`.
 | `--output-dir` | temp dir | Directory for output files |
 | `--keep-files` | `false` | Keep intermediate STL and raw G-code |
 
-### Configuration File
+### General Options
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--config` | auto-detect | Path to a TOML config file |
+| `-v`, `--verbose` | `false` | Show detailed debug output |
 
-See the [Configuration](#configuration) section above for setup details and
-supported keys.
+See the [Configuration](#configuration) section above for config file setup
+and supported keys.
 
 ## Examples
 
