@@ -39,7 +39,7 @@ VASE_MODE_SLICER_ARGS: Dict[str, str] = {
     "first-layer-height": "0.2",
     "perimeters": "1",
     "top-solid-layers": "0",
-    "bottom-solid-layers": "1",
+    "bottom-solid-layers": "0",
     "fill-density": "0%",
     "skirts": "0",
     "brim-width": "5",
