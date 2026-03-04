@@ -27,6 +27,7 @@ CONFIG_KEYS: frozenset[str] = frozenset({
     "output-dir",
     "bed-center",
     "nozzle-size",
+    "printer",
 })
 
 #: Map TOML key names (hyphenated) to argparse attribute names (underscored).

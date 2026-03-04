@@ -2,7 +2,7 @@
 
 CLI tool suite for 3D printer filament calibration on Prusa printers.
 
-**Two calibration tools included:**
+**Three calibration tools included:**
 
 - **`temperature-tower`** — generates a parametric temperature tower, slices it
   with PrusaSlicer, injects per-tier temperature changes into the G-code, and
@@ -10,6 +10,9 @@ CLI tool suite for 3D printer filament calibration on Prusa printers.
 - **`volumetric-flow`** — generates a serpentine wall specimen, slices it in
   spiral vase mode, and injects progressively increasing print speeds to
   determine the maximum volumetric flow rate for a filament/hotend combination.
+- **`pressure-advance`** — generates a hollow rectangular tower with sharp
+  corners, slices it with PrusaSlicer, and injects pressure advance commands
+  at each height level to find the optimal PA value for your setup.
 
 ## Prerequisites
 
@@ -35,8 +38,8 @@ This pulls all Python dependencies from PyPI automatically:
 [gcode-lib](https://github.com/hyiger/gcode-lib) (>= 1.0.0) for G-code
 manipulation.
 
-Both the `temperature-tower` and `volumetric-flow` commands are available
-whenever the venv is active. To reactivate later, run
+The `temperature-tower`, `volumetric-flow`, and `pressure-advance` commands
+are available whenever the venv is active. To reactivate later, run
 `source .venv/bin/activate` from the project directory.
 
 ### Python version compatibility
@@ -76,7 +79,7 @@ pip install -e .
 
 ## Filament Presets
 
-Both tools use presets from `gcode-lib` to set smart defaults for each filament
+All three tools use presets from `gcode-lib` to set smart defaults for each filament
 type. Known presets: **ABS**, **ASA**, **HIPS**, **PA**, **PA-CF**, **PC**,
 **PCTG**, **PETG**, **PETG-CF**, **PLA**, **PLA-CF**, **PP**, **PPA**, **TPU**.
 
@@ -104,13 +107,18 @@ Then edit it with your printer and slicer details:
 printer-url = "http://192.168.1.100"
 api-key = "your-prusalink-api-key"
 
+# Printer model — generates printer-specific start/end G-code
+# for pressure-advance (when no --config-ini is given).
+# Supported: coreone, coreonel, mk4s, mini, xl
+# printer = "coreone"
+
 # Slicer setup (prusaslicer-path is only needed if PrusaSlicer is not
 # installed in a standard location — the tool auto-detects it on PATH)
 # prusaslicer-path = "/usr/bin/prusa-slicer"
 # config-ini = "/path/to/printer-profile.ini"
 
 # Bed centre in mm — default is 125,105 (Prusa MK-series).
-# For Prusa MINI, use 90,90.
+# Auto-set by printer if specified. For Prusa MINI, use 90,90.
 # bed-center = "125,105"
 
 # Nozzle size in mm — derives layer height (nozzle × 0.5) and
@@ -127,7 +135,7 @@ All keys are optional — include only what you need. In particular,
 location (e.g. `/usr/bin/prusa-slicer`, `/Applications/PrusaSlicer.app`, or
 anywhere on your `PATH`).
 
-The config file is shared between both tools.
+The config file is shared between all three tools.
 
 ### Config file locations
 
@@ -408,6 +416,195 @@ volumetric-flow \
   --start-speed 5 --end-speed 20 --step 1 \
   --config-ini ~/PrusaSlicer/my_profile.ini \
   --no-upload
+```
+
+---
+
+## Pressure Advance
+
+### Quick Start
+
+Test PA from 0.0 to 0.10 in 0.01 steps (direct drive extruder):
+
+```bash
+pressure-advance \
+  --start-pa 0 --end-pa 0.10 --pa-step 0.01 \
+  --no-upload --output-dir ./output --keep-files
+```
+
+Upload directly to printer:
+
+```bash
+pressure-advance \
+  --start-pa 0 --end-pa 0.10 --pa-step 0.01 \
+  --printer-url http://192.168.1.100 \
+  --api-key YOUR_API_KEY
+```
+
+### How It Works
+
+1. **Model generation** — CadQuery builds a hollow rectangular tower (60×60 mm,
+   1.6 mm wall thickness) with perfectly sharp 90° corners. The tower height
+   equals `num_levels × level_height`. Sharp corners are critical — they reveal
+   PA tuning quality at each level.
+
+2. **Slicing** — PrusaSlicer CLI slices the STL using either a user-supplied
+   `.ini` profile or built-in defaults (2 perimeters, 0% infill, no top/bottom
+   solid layers). Layer height and extrusion width are derived from
+   `--nozzle-size`.
+
+3. **PA command insertion** — Pressure advance commands are inserted at the
+   G-code layer boundaries corresponding to each level. Marlin firmware uses
+   `M900 K<value>`, Klipper uses `SET_PRESSURE_ADVANCE ADVANCE=<value>`.
+
+4. **Upload** — Same PrusaLink upload path as the other tools.
+
+### Interpreting the Print
+
+Print the specimen and examine the corners at each level. The level with the
+sharpest corners (no bulging, no rounding) is your optimal pressure advance
+value. The tool prints a lookup table mapping Z heights to PA values for easy
+reference.
+
+### CLI Reference
+
+#### Pressure Advance Options
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--start-pa` | *required* | Starting PA value (bottom level) |
+| `--end-pa` | *required* | Ending PA value (top level) |
+| `--pa-step` | *required* | PA value increment per level |
+| `--firmware` | `marlin` | Firmware type: `marlin` (M900) or `klipper` (SET_PRESSURE_ADVANCE) |
+
+The PA range must be evenly divisible by `--pa-step`, and the resulting number
+of levels cannot exceed 50. `--start-pa` must be non-negative.
+
+#### Model Options
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--filament-type` | `PLA` | Filament type — sets nozzle temp, bed temp, and fan speed from preset |
+| `--level-height` | `1.0` | Height per PA level in mm |
+
+#### Nozzle Options
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--nozzle-size` | `0.4` | Nozzle diameter in mm — derives layer height and extrusion width |
+
+#### Slicer Options
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--nozzle-temp` | from preset | Nozzle temperature (deg C) — overrides preset |
+| `--bed-temp` | from preset | Bed temperature (deg C) — overrides preset |
+| `--fan-speed` | from preset | Fan speed (0--100%) — overrides preset |
+| `--layer-height` | from `--nozzle-size` | Slicer layer height in mm (default: nozzle × 0.5) |
+| `--extrusion-width` | from `--nozzle-size` | Slicer extrusion width in mm (default: nozzle × 1.125) |
+| `--config-ini` | | PrusaSlicer `.ini` config file |
+| `--prusaslicer-path` | auto-detect | Path to PrusaSlicer executable |
+| `--printer` | `COREONE` | Printer model for start/end G-code (see below) |
+| `--bed-center` | `125,105` | Bed centre as X,Y in mm (auto-set by `--printer`) |
+| `--extra-slicer-args` | | Additional PrusaSlicer CLI args (must be last) |
+
+#### Printer-Specific Start/End G-code
+
+When `--printer` is specified and no `--config-ini` is given, the tool
+renders printer-specific start and end G-code and passes it to PrusaSlicer.
+This eliminates the need for a separate slicer profile and produces ready-to-
+print output with proper homing, mesh bed leveling, and parking sequences.
+
+Supported printers: **COREONE**, **COREONEL**, **MK4S** (alias: MK4),
+**MINI**, **XL**.
+
+The `--printer` flag also auto-sets `--bed-center` from the printer's known
+bed dimensions (you can still override with an explicit `--bed-center`).
+
+The start G-code includes mesh bed leveling at a safe probing temperature
+(170 deg C or hotend temp, whichever is lower) and cooling fan during MBL for
+PLA-like filaments (disabled for filaments requiring an enclosure like ABS/ASA).
+
+#### Printer Options
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--printer-url` | | PrusaLink URL (e.g. `http://192.168.1.100`) |
+| `--api-key` | | PrusaLink API key |
+| `--no-upload` | `false` | Skip uploading to printer |
+| `--print-after-upload` | `false` | Start printing after upload |
+
+#### Output Options
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--output-dir` | temp dir | Directory for output files |
+| `--keep-files` | `false` | Keep intermediate STL and raw G-code |
+| `--config` | auto-detect | Path to a TOML config file |
+| `-v`, `--verbose` | `false` | Show detailed debug output |
+
+### Examples
+
+Direct drive extruder (typical PA range 0.02--0.10):
+
+```bash
+pressure-advance \
+  --start-pa 0 --end-pa 0.10 --pa-step 0.01 \
+  --no-upload --output-dir ./output
+```
+
+With printer-specific G-code for Prusa Core One:
+
+```bash
+pressure-advance \
+  --start-pa 0 --end-pa 0.10 --pa-step 0.01 \
+  --printer coreone \
+  --no-upload --output-dir ./output
+```
+
+Bowden extruder (typical PA range 0.3--1.0):
+
+```bash
+pressure-advance \
+  --start-pa 0.3 --end-pa 1.0 --pa-step 0.05 \
+  --no-upload --output-dir ./output
+```
+
+Klipper firmware:
+
+```bash
+pressure-advance \
+  --start-pa 0 --end-pa 0.10 --pa-step 0.01 \
+  --firmware klipper \
+  --no-upload
+```
+
+PETG with custom temperatures:
+
+```bash
+pressure-advance \
+  --start-pa 0 --end-pa 0.10 --pa-step 0.01 \
+  --filament-type PETG \
+  --nozzle-temp 240 --bed-temp 80 \
+  --no-upload
+```
+
+With a 0.6mm nozzle (auto-sets 0.3mm layer height, 0.68mm extrusion width):
+
+```bash
+pressure-advance \
+  --start-pa 0 --end-pa 0.10 --pa-step 0.01 \
+  --nozzle-size 0.6 \
+  --no-upload
+```
+
+MK4S with ABS filament:
+
+```bash
+pressure-advance \
+  --start-pa 0 --end-pa 0.08 --pa-step 0.01 \
+  --printer mk4s --filament-type ABS \
+  --no-upload --output-dir ./output
 ```
 
 ---

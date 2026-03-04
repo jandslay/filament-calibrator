@@ -175,6 +175,7 @@ _ARGPARSE_DEFAULTS: Dict[str, object] = {
     "output_dir": None,
     "bed_center": None,
     "nozzle_size": 0.4,
+    "printer": "COREONE",
 }
 
 

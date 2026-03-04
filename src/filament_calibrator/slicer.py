@@ -1,7 +1,8 @@
 """PrusaSlicer orchestration for calibration model slicing.
 
 Wraps gcode-lib's PrusaSlicer CLI helpers with sensible defaults for
-temperature tower prints and volumetric flow specimens.
+temperature tower prints, volumetric flow specimens, and pressure advance
+calibration towers.
 """
 from __future__ import annotations
 
@@ -29,7 +30,8 @@ DEFAULT_BED_CENTER: str = "125,105"
 
 # Thumbnail sizes embedded in G-code for LCD preview on Prusa printers.
 # 16×16 provides a small icon; 220×124 matches the MK3S LCD resolution.
-DEFAULT_THUMBNAILS: str = "16x16,220x124"
+# PrusaSlicer 2.9+ requires the format suffix (e.g. /PNG) in each size spec.
+DEFAULT_THUMBNAILS: str = "16x16/PNG,220x124/PNG"
 DEFAULT_BED_SHAPE: str = "0x0,250x0,250x210,0x210"
 """Slicer defaults applied when no ``--config-ini`` is supplied.
 
@@ -53,6 +55,23 @@ VASE_MODE_SLICER_ARGS: Dict[str, str] = {
 Single perimeter, no infill, no top layers — spiral-vase mode handles the
 rest.  ``layer-height`` and ``extrusion-width`` are passed explicitly by
 :func:`slice_flow_specimen` so they are **not** included here.
+"""
+
+# Slicer settings for PA calibration tower (used when no .ini provided).
+PA_SLICER_ARGS: Dict[str, str] = {
+    "first-layer-height": "0.2",
+    "perimeters": "2",
+    "top-solid-layers": "0",
+    "bottom-solid-layers": "0",
+    "fill-density": "0%",
+    "skirts": "1",
+}
+"""Slicer defaults for pressure advance calibration towers.
+
+Two perimeters for inner/outer wall interaction at corners, zero infill
+(hollow interior handled by the shell geometry), zero top/bottom solid
+layers.  ``layer-height`` and ``extrusion-width`` are passed explicitly
+by :func:`slice_pa_specimen` so they are **not** included here.
 """
 
 
@@ -241,6 +260,103 @@ def slice_flow_specimen(
     if fan_speed is not None:
         cli_extra.append(f"--max-fan-speed={fan_speed}")
         cli_extra.append(f"--min-fan-speed={fan_speed}")
+
+    if extra_args:
+        cli_extra.extend(extra_args)
+
+    req = gl.SliceRequest(
+        input_path=stl_path,
+        output_path=output_gcode_path,
+        config_ini=config_ini,
+        extra_args=cli_extra,
+    )
+    return gl.slice_model(exe, req)
+
+
+def slice_pa_specimen(
+    stl_path: str,
+    output_gcode_path: str,
+    layer_height: float = 0.2,
+    extrusion_width: float = 0.45,
+    config_ini: Optional[str] = None,
+    prusaslicer_path: Optional[str] = None,
+    extra_args: Optional[List[str]] = None,
+    nozzle_temp: Optional[int] = None,
+    bed_temp: Optional[int] = None,
+    fan_speed: Optional[int] = None,
+    bed_center: Optional[str] = None,
+    nozzle_diameter: Optional[float] = None,
+    start_gcode: Optional[str] = None,
+    end_gcode: Optional[str] = None,
+) -> gl.RunResult:
+    """Slice a pressure advance calibration tower STL.
+
+    When *config_ini* is ``None``, :data:`PA_SLICER_ARGS` are applied
+    together with the explicit *layer_height* and *extrusion_width*.
+    Uses 2 perimeters, 0% infill, and no top/bottom solid layers.
+
+    Parameters
+    ----------
+    stl_path:          Path to the input ``.stl`` file.
+    output_gcode_path: Desired output G-code path.
+    layer_height:      Layer height in mm (default 0.2).
+    extrusion_width:   Extrusion width in mm (default 0.45).
+    config_ini:        Optional PrusaSlicer ``.ini`` config file path.
+    prusaslicer_path:  Explicit path to PrusaSlicer executable.
+    extra_args:        Additional raw CLI arguments.
+    nozzle_temp:       Nozzle temperature in °C.
+    bed_temp:          Bed temperature in °C.
+    fan_speed:         Fan speed 0–100 %.
+    bed_center:        Bed centre as ``"X,Y"`` (defaults to
+                       :data:`DEFAULT_BED_CENTER`).
+    nozzle_diameter:   Nozzle diameter in mm (passed as
+                       ``--nozzle-diameter``).
+    start_gcode:       Rendered start G-code string.  When provided,
+                       passed to PrusaSlicer via ``--start-gcode``.
+    end_gcode:         Rendered end G-code string.  When provided,
+                       passed to PrusaSlicer via ``--end-gcode``.
+
+    Returns
+    -------
+    gcode_lib.RunResult
+
+    Raises
+    ------
+    FileNotFoundError
+        If PrusaSlicer cannot be found.
+    """
+    exe = gl.find_prusaslicer_executable(explicit_path=prusaslicer_path)
+
+    cli_extra: List[str] = [
+        f"--center={bed_center or DEFAULT_BED_CENTER}",
+        f"--bed-shape={DEFAULT_BED_SHAPE}",
+        f"--thumbnails={DEFAULT_THUMBNAILS}",
+    ]
+
+    if config_ini is None:
+        for key, val in PA_SLICER_ARGS.items():
+            cli_extra.append(f"--{key}={val}")
+        cli_extra.append(f"--layer-height={layer_height}")
+        cli_extra.append(f"--extrusion-width={extrusion_width}")
+
+    if nozzle_diameter is not None:
+        cli_extra.append(f"--nozzle-diameter={nozzle_diameter}")
+    if nozzle_temp is not None:
+        cli_extra.append(f"--temperature={nozzle_temp}")
+        cli_extra.append(f"--first-layer-temperature={nozzle_temp}")
+    if bed_temp is not None:
+        cli_extra.append(f"--bed-temperature={bed_temp}")
+        cli_extra.append(f"--first-layer-bed-temperature={bed_temp}")
+    if fan_speed is not None:
+        cli_extra.append(f"--max-fan-speed={fan_speed}")
+        cli_extra.append(f"--min-fan-speed={fan_speed}")
+
+    if start_gcode is not None:
+        escaped = start_gcode.replace("\n", "\\n")
+        cli_extra.append(f"--start-gcode={escaped}")
+    if end_gcode is not None:
+        escaped = end_gcode.replace("\n", "\\n")
+        cli_extra.append(f"--end-gcode={escaped}")
 
     if extra_args:
         cli_extra.extend(extra_args)
