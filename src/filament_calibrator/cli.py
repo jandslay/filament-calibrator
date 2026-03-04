@@ -12,6 +12,7 @@ from typing import Dict, List, Optional
 
 import gcode_lib as gl
 
+from filament_calibrator.config import load_config
 from filament_calibrator.model import TowerConfig, generate_tower_stl
 from filament_calibrator.slicer import slice_tower
 from filament_calibrator.tempinsert import compute_temp_tiers, insert_temperatures
@@ -112,6 +113,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Start printing immediately after upload.",
     )
 
+    # --- Config file ---
+    p.add_argument(
+        "--config", type=str, default=None, metavar="PATH",
+        help=(
+            "Path to a TOML config file. "
+            "Default lookup: ./filament-calibrator.toml, "
+            "then ~/.config/filament-calibrator/config.toml."
+        ),
+    )
+
     # --- Output options ---
     output = p.add_argument_group("output options")
     output.add_argument(
@@ -124,6 +135,31 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     return p
+
+
+# Argparse defaults for config-eligible string/flag fields.
+_ARGPARSE_DEFAULTS: Dict[str, object] = {
+    "printer_url": None,
+    "api_key": None,
+    "prusaslicer_path": None,
+    "config_ini": None,
+    "filament_type": "PLA",
+    "output_dir": None,
+}
+
+
+def _apply_config(args: argparse.Namespace, config: Dict[str, object]) -> None:
+    """Apply TOML config values to *args* where the user didn't supply a CLI value.
+
+    Only overwrites an attribute when it is still at its argparse default.
+    Mutates *args* in place.
+    """
+    for attr, value in config.items():
+        if attr not in _ARGPARSE_DEFAULTS:
+            continue
+        current = getattr(args, attr, _ARGPARSE_DEFAULTS[attr])
+        if current == _ARGPARSE_DEFAULTS[attr]:
+            setattr(args, attr, value)
 
 
 def _resolve_output_dir(output_dir: Optional[str]) -> Path:
@@ -220,6 +256,10 @@ def run(args: argparse.Namespace) -> None:
     4. Insert temperature changes into the G-code.
     5. Upload to the printer (unless ``--no-upload``).
     """
+    # Load TOML config and apply defaults before anything else.
+    toml_config = load_config(args.config)
+    _apply_config(args, toml_config)
+
     # Fail fast: validate upload requirements before expensive pipeline steps.
     if not args.no_upload and (not args.printer_url or not args.api_key):
         print("Error: --printer-url and --api-key are required for upload.",

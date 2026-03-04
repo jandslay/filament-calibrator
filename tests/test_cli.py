@@ -11,8 +11,10 @@ import pytest
 import gcode_lib as gl
 
 from filament_calibrator.cli import (
+    _ARGPARSE_DEFAULTS,
     _UNSET,
     _KNOWN_TYPES,
+    _apply_config,
     _compute_num_tiers,
     build_parser,
     main,
@@ -55,6 +57,16 @@ class TestBuildParser:
         assert args.output_dir is None
         assert args.keep_files is False
 
+    def test_config_flag_default(self):
+        p = build_parser()
+        args = p.parse_args([])
+        assert args.config is None
+
+    def test_config_flag_explicit(self):
+        p = build_parser()
+        args = p.parse_args(["--config", "/path/to/config.toml"])
+        assert args.config == "/path/to/config.toml"
+
     def test_all_options(self):
         p = build_parser()
         # --extra-slicer-args must come last because nargs=REMAINDER consumes
@@ -76,6 +88,7 @@ class TestBuildParser:
             "--print-after-upload",
             "--output-dir", "/tmp/out",
             "--keep-files",
+            "--config", "/path/to/config.toml",
             "--extra-slicer-args", "--nozzle-diameter", "0.4",
         ])
         assert args.high_temp == 250
@@ -95,6 +108,7 @@ class TestBuildParser:
         assert args.print_after_upload is True
         assert args.output_dir == "/tmp/out"
         assert args.keep_files is True
+        assert args.config == "/path/to/config.toml"
 
     def test_known_types(self):
         """_KNOWN_TYPES lists sorted preset names from gcode-lib."""
@@ -102,6 +116,91 @@ class TestBuildParser:
         assert "PLA" in _KNOWN_TYPES
         assert "PETG" in _KNOWN_TYPES
         assert _KNOWN_TYPES == sorted(_KNOWN_TYPES)
+
+
+# ---------------------------------------------------------------------------
+# _apply_config
+# ---------------------------------------------------------------------------
+
+
+class TestApplyConfig:
+    def test_applies_config_to_defaults(self):
+        args = argparse.Namespace(
+            printer_url=None, api_key=None, prusaslicer_path=None,
+            config_ini=None, filament_type="PLA", output_dir=None,
+        )
+        config = {
+            "printer_url": "http://10.0.0.1",
+            "api_key": "secret",
+            "output_dir": "/tmp/out",
+        }
+        _apply_config(args, config)
+        assert args.printer_url == "http://10.0.0.1"
+        assert args.api_key == "secret"
+        assert args.output_dir == "/tmp/out"
+
+    def test_cli_overrides_config(self):
+        args = argparse.Namespace(
+            printer_url="http://cli.local", api_key=None,
+            prusaslicer_path=None, config_ini=None,
+            filament_type="PETG", output_dir=None,
+        )
+        config = {
+            "printer_url": "http://toml.local",
+            "filament_type": "ABS",
+        }
+        _apply_config(args, config)
+        # CLI value "http://cli.local" wins over TOML
+        assert args.printer_url == "http://cli.local"
+        # CLI value "PETG" != default "PLA", so it wins
+        assert args.filament_type == "PETG"
+
+    def test_ignores_unknown_keys(self):
+        args = argparse.Namespace(
+            printer_url=None, api_key=None, prusaslicer_path=None,
+            config_ini=None, filament_type="PLA", output_dir=None,
+        )
+        config = {"unknown_key": "value"}
+        _apply_config(args, config)
+        assert not hasattr(args, "unknown_key")
+
+    def test_empty_config(self):
+        args = argparse.Namespace(
+            printer_url=None, api_key=None, prusaslicer_path=None,
+            config_ini=None, filament_type="PLA", output_dir=None,
+        )
+        _apply_config(args, {})
+        assert args.printer_url is None
+        assert args.filament_type == "PLA"
+
+    def test_all_keys_applied(self):
+        args = argparse.Namespace(
+            printer_url=None, api_key=None, prusaslicer_path=None,
+            config_ini=None, filament_type="PLA", output_dir=None,
+        )
+        config = {
+            "printer_url": "http://10.0.0.1",
+            "api_key": "key",
+            "prusaslicer_path": "/usr/bin/ps",
+            "config_ini": "/path/to/profile.ini",
+            "filament_type": "ABS",
+            "output_dir": "/tmp/out",
+        }
+        _apply_config(args, config)
+        assert args.printer_url == "http://10.0.0.1"
+        assert args.api_key == "key"
+        assert args.prusaslicer_path == "/usr/bin/ps"
+        assert args.config_ini == "/path/to/profile.ini"
+        assert args.filament_type == "ABS"
+        assert args.output_dir == "/tmp/out"
+
+
+class TestArgparseDefaults:
+    def test_covers_config_keys(self):
+        """_ARGPARSE_DEFAULTS has an entry for every config-eligible key."""
+        from filament_calibrator.config import _KEY_TO_ATTR
+        for attr in _KEY_TO_ATTR.values():
+            assert attr in _ARGPARSE_DEFAULTS
 
 
 # ---------------------------------------------------------------------------
@@ -312,6 +411,7 @@ class TestRun:
             printer_url=None, api_key=None,
             no_upload=True, print_after_upload=False,
             output_dir=str(tmp_path), keep_files=False,
+            config=None,
         )
         defaults.update(overrides)
         return argparse.Namespace(**defaults)
@@ -504,6 +604,63 @@ class TestRun:
         slice_kwargs = mock_slice.call_args[1]
         assert slice_kwargs["bed_temp"] == 85
         assert slice_kwargs["fan_speed"] == 50
+
+    @patch("filament_calibrator.cli.gl.save")
+    @patch("filament_calibrator.cli.gl.load")
+    @patch("filament_calibrator.cli.insert_temperatures")
+    @patch("filament_calibrator.cli.compute_temp_tiers")
+    @patch("filament_calibrator.cli.slice_tower")
+    @patch("filament_calibrator.cli.generate_tower_stl")
+    def test_config_file_applies_defaults(
+        self, mock_gen, mock_slice, mock_tiers,
+        mock_insert, mock_load, mock_save, tmp_path
+    ):
+        # Write a TOML config that sets filament-type to PETG
+        cfg = tmp_path / "test.toml"
+        cfg.write_text('filament-type = "PETG"\n')
+
+        mock_gen.return_value = str(tmp_path / "tower.stl")
+        mock_slice.return_value = MagicMock(ok=True)
+        mock_tiers.return_value = []
+        mock_load.return_value = MagicMock(lines=[])
+        mock_insert.return_value = []
+
+        args = self._make_args(tmp_path, config=str(cfg))
+        run(args)
+
+        # filament_type should be PETG from config (overriding PLA default)
+        gen_call = mock_gen.call_args
+        tower_config = gen_call[0][0]
+        assert tower_config.filament_type == "PETG"
+
+    @patch("filament_calibrator.cli.gl.save")
+    @patch("filament_calibrator.cli.gl.load")
+    @patch("filament_calibrator.cli.insert_temperatures")
+    @patch("filament_calibrator.cli.compute_temp_tiers")
+    @patch("filament_calibrator.cli.slice_tower")
+    @patch("filament_calibrator.cli.generate_tower_stl")
+    def test_cli_overrides_config_file(
+        self, mock_gen, mock_slice, mock_tiers,
+        mock_insert, mock_load, mock_save, tmp_path
+    ):
+        cfg = tmp_path / "test.toml"
+        cfg.write_text('filament-type = "PETG"\n')
+
+        mock_gen.return_value = str(tmp_path / "tower.stl")
+        mock_slice.return_value = MagicMock(ok=True)
+        mock_tiers.return_value = []
+        mock_load.return_value = MagicMock(lines=[])
+        mock_insert.return_value = []
+
+        # CLI explicitly sets filament_type to ABS, should override TOML's PETG
+        args = self._make_args(
+            tmp_path, config=str(cfg), filament_type="ABS",
+        )
+        run(args)
+
+        gen_call = mock_gen.call_args
+        tower_config = gen_call[0][0]
+        assert tower_config.filament_type == "ABS"
 
 
 # ---------------------------------------------------------------------------
