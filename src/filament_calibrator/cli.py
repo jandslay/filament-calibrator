@@ -23,6 +23,10 @@ _UNSET = object()
 # Known filament type names from gcode-lib presets.
 _KNOWN_TYPES = sorted(gl.FILAMENT_PRESETS.keys())
 
+# Reasonable hotend temperature bounds for validation.
+MIN_PRINT_TEMP = 150   # °C — below this no common filament prints
+MAX_PRINT_TEMP = 350   # °C — above this is outside consumer hotend range
+
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the argument parser."""
@@ -206,14 +210,28 @@ def resolve_preset(args: argparse.Namespace) -> Dict[str, object]:
 def _compute_num_tiers(start_temp: int, end_temp: int, temp_step: int) -> int:
     """Compute the number of tiers from a temperature range.
 
-    Validates that *start_temp* > *end_temp*, that the range is evenly
-    divisible by *temp_step*, and that the result is at most 10 tiers.
-    Calls :func:`sys.exit` with a clear message on validation failure.
+    Validates inputs and calls :func:`sys.exit` on failure:
+
+    * *temp_step* must be positive.
+    * Both temperatures must be within ``MIN_PRINT_TEMP``–``MAX_PRINT_TEMP``.
+    * *start_temp* must be ≥ *end_temp* + *temp_step* (at least 2 tiers).
+    * The range must be evenly divisible by *temp_step*.
+    * The result must be at most 10 tiers.
     """
-    if start_temp <= end_temp:
+    if temp_step <= 0:
         sys.exit(
-            "error: --start-temp must be greater than --end-temp "
-            f"(got {start_temp} and {end_temp})"
+            f"error: --temp-step must be positive (got {temp_step})"
+        )
+    for label, temp in [("--start-temp", start_temp), ("--end-temp", end_temp)]:
+        if temp < MIN_PRINT_TEMP or temp > MAX_PRINT_TEMP:
+            sys.exit(
+                f"error: {label} {temp}°C is outside the normal printing "
+                f"range ({MIN_PRINT_TEMP}–{MAX_PRINT_TEMP}°C)"
+            )
+    if start_temp < end_temp + temp_step:
+        sys.exit(
+            "error: --start-temp must be at least --end-temp + --temp-step "
+            f"(got {start_temp} < {end_temp} + {temp_step})"
         )
     spread = start_temp - end_temp
     if spread % temp_step != 0:

@@ -14,6 +14,8 @@ from filament_calibrator.cli import (
     _ARGPARSE_DEFAULTS,
     _UNSET,
     _KNOWN_TYPES,
+    MAX_PRINT_TEMP,
+    MIN_PRINT_TEMP,
     _apply_config,
     _compute_num_tiers,
     build_parser,
@@ -361,11 +363,11 @@ class TestComputeNumTiers:
         with pytest.raises(SystemExit):
             _compute_num_tiers(250, 200, 5)
 
-    def test_high_equals_low_exits(self):
+    def test_start_equals_end_exits(self):
         with pytest.raises(SystemExit):
             _compute_num_tiers(200, 200, 5)
 
-    def test_high_less_than_low_exits(self):
+    def test_start_less_than_end_exits(self):
         with pytest.raises(SystemExit):
             _compute_num_tiers(190, 200, 5)
 
@@ -377,6 +379,44 @@ class TestComputeNumTiers:
     def test_ten_tiers_allowed(self):
         # 250→200 step 5 → 11 (too many), but 245→200 step 5 → 10 (ok)
         assert _compute_num_tiers(245, 200, 5) == 10
+
+    def test_temp_step_zero_exits(self):
+        with pytest.raises(SystemExit, match="--temp-step must be positive"):
+            _compute_num_tiers(230, 200, 0)
+
+    def test_temp_step_negative_exits(self):
+        with pytest.raises(SystemExit, match="--temp-step must be positive"):
+            _compute_num_tiers(230, 200, -5)
+
+    def test_start_temp_below_min_exits(self):
+        with pytest.raises(SystemExit, match="outside the normal printing range"):
+            _compute_num_tiers(140, 130, 5)
+
+    def test_start_temp_above_max_exits(self):
+        with pytest.raises(SystemExit, match="outside the normal printing range"):
+            _compute_num_tiers(360, 340, 5)
+
+    def test_end_temp_below_min_exits(self):
+        with pytest.raises(SystemExit, match="outside the normal printing range"):
+            _compute_num_tiers(160, 140, 5)
+
+    def test_end_temp_above_max_exits(self):
+        with pytest.raises(SystemExit, match="outside the normal printing range"):
+            _compute_num_tiers(MAX_PRINT_TEMP, MAX_PRINT_TEMP + 10, 5)
+
+    def test_boundary_temps_allowed(self):
+        # Exactly at MIN and MAX boundaries should be valid
+        assert _compute_num_tiers(MIN_PRINT_TEMP + 10, MIN_PRINT_TEMP, 5) == 3
+        assert _compute_num_tiers(MAX_PRINT_TEMP, MAX_PRINT_TEMP - 10, 5) == 3
+
+    def test_range_smaller_than_step_exits(self):
+        # 205→200 = 5°C range, but step is 10 → range too small
+        with pytest.raises(SystemExit, match="at least --end-temp \\+ --temp-step"):
+            _compute_num_tiers(205, 200, 10)
+
+    def test_print_range_constants(self):
+        assert MIN_PRINT_TEMP == 150
+        assert MAX_PRINT_TEMP == 350
 
 
 class TestBuildTowerConfig:

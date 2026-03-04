@@ -79,7 +79,9 @@ All preset values can be overridden with explicit CLI flags.
 | `--brand-bottom` | | Optional brand label on bottom |
 
 Tier count is computed automatically: `(start_temp - end_temp) / temp_step + 1`,
-validated to a maximum of 10.
+validated to a maximum of 10. Temperatures must be within 150–350°C,
+`--start-temp` must be at least `--end-temp + --temp-step`, and the range
+must be evenly divisible by `--temp-step`.
 
 ### Slicer Options
 
