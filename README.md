@@ -41,6 +41,46 @@ Generate without uploading:
 temperature-tower --no-upload --output-dir ./output --keep-files
 ```
 
+## Configuration
+
+Save commonly reused settings in a TOML file so you don't have to pass them
+on every run. To get started, copy the example file:
+
+```bash
+cp filament-calibrator.example.toml filament-calibrator.toml
+```
+
+Then edit it with your printer and slicer details:
+
+```toml
+# Printer connection (required for uploading)
+printer-url = "http://192.168.1.100"
+api-key = "your-prusalink-api-key"
+
+# Slicer setup
+prusaslicer-path = "/usr/bin/prusa-slicer"
+config-ini = "/path/to/printer-profile.ini"
+
+# Defaults
+filament-type = "PLA"
+output-dir = "./output"
+```
+
+All keys are optional — include only what you need.
+
+### Config file locations
+
+The tool looks for a config file in this order (first found wins):
+
+| Priority | Location | Use case |
+|----------|----------|----------|
+| 1 | `--config <path>` | Explicit override |
+| 2 | `./filament-calibrator.toml` | Per-project settings |
+| 3 | `~/.config/filament-calibrator/config.toml` | User-wide defaults |
+
+CLI arguments always override config file values, so you can set your usual
+defaults in the file and override individual flags as needed.
+
 ## How It Works
 
 1. **Model generation** -- CadQuery builds a parametric temp tower STL matching
@@ -124,24 +164,8 @@ must be evenly divisible by `--temp-step`.
 |------|---------|-------------|
 | `--config` | auto-detect | Path to a TOML config file |
 
-Commonly reused settings can be saved in a TOML config file instead of passing
-them on every invocation. The tool looks for config files in this order:
-
-1. `--config <path>` (explicit)
-2. `./filament-calibrator.toml` (project-local)
-3. `~/.config/filament-calibrator/config.toml` (user config)
-
-CLI arguments always override config file values. See
-`filament-calibrator.example.toml` for the supported keys:
-
-```toml
-printer-url = "http://192.168.1.100"
-api-key = "your-prusalink-api-key"
-prusaslicer-path = "/usr/bin/prusa-slicer"
-config-ini = "/path/to/printer-profile.ini"
-filament-type = "PLA"
-output-dir = "./output"
-```
+See the [Configuration](#configuration) section above for setup details and
+supported keys.
 
 ## Examples
 
