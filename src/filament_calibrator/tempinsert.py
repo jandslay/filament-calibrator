@@ -39,22 +39,22 @@ class TempTier:
 
 
 def compute_temp_tiers(
-    high_temp: int,
-    temp_jump: int,
+    start_temp: int,
+    temp_step: int,
     num_tiers: int,
     base_height: float = BASE_HEIGHT,
     tier_height: float = TIER_HEIGHT,
 ) -> List[TempTier]:
     """Calculate the Z ranges and temperatures for each tier.
 
-    Tier 0 (bottom) gets *high_temp*.  Each subsequent tier is *temp_jump*
+    Tier 0 (bottom) gets *start_temp*.  Each subsequent tier is *temp_step*
     degrees cooler.  The base plate (Z 0 → *base_height*) is **not** a
     temperature tier — it prints at the first tier's temperature.
 
     Parameters
     ----------
-    high_temp:   Highest temperature (bottom tier).
-    temp_jump:   Temperature decrease per tier.
+    start_temp:  Highest temperature (bottom tier).
+    temp_step:   Temperature decrease per tier.
     num_tiers:   Number of tiers.
     base_height: Height of the base plate in mm.
     tier_height: Height of each tier in mm.
@@ -68,7 +68,7 @@ def compute_temp_tiers(
     for i in range(num_tiers):
         z_start = base_height + i * tier_height
         z_end = z_start + tier_height
-        temp = high_temp - i * temp_jump
+        temp = start_temp - i * temp_step
         tiers.append(TempTier(temp=temp, z_start=z_start, z_end=z_end))
     return tiers
 

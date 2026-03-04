@@ -59,19 +59,19 @@ from filament_calibrator.model import (
 class TestTowerConfig:
     def test_defaults(self):
         c = TowerConfig()
-        assert c.high_temp == 220
-        assert c.temp_jump == 10
+        assert c.start_temp == 220
+        assert c.temp_step == 10
         assert c.num_tiers == 9
         assert c.filament_type == "PLA"
         assert c.brand_top == ""
         assert c.brand_bottom == ""
 
     def test_custom(self):
-        c = TowerConfig(high_temp=250, temp_jump=5, num_tiers=6,
+        c = TowerConfig(start_temp=250, temp_step=5, num_tiers=6,
                         filament_type="PETG", brand_top="BrandA",
                         brand_bottom="BrandB")
-        assert c.high_temp == 250
-        assert c.temp_jump == 5
+        assert c.start_temp == 250
+        assert c.temp_step == 5
         assert c.num_tiers == 6
         assert c.filament_type == "PETG"
         assert c.brand_top == "BrandA"
@@ -85,19 +85,19 @@ class TestTowerConfig:
 
 class TestTierTemperature:
     def test_bottom_tier(self):
-        c = TowerConfig(high_temp=220, temp_jump=10)
+        c = TowerConfig(start_temp=220, temp_step=10)
         assert tier_temperature(c, 0) == 220
 
     def test_second_tier(self):
-        c = TowerConfig(high_temp=220, temp_jump=10)
+        c = TowerConfig(start_temp=220, temp_step=10)
         assert tier_temperature(c, 1) == 210
 
     def test_top_tier(self):
-        c = TowerConfig(high_temp=220, temp_jump=10, num_tiers=9)
+        c = TowerConfig(start_temp=220, temp_step=10, num_tiers=9)
         assert tier_temperature(c, 8) == 140
 
-    def test_custom_jump(self):
-        c = TowerConfig(high_temp=250, temp_jump=5)
+    def test_custom_step(self):
+        c = TowerConfig(start_temp=250, temp_step=5)
         assert tier_temperature(c, 3) == 235
 
 

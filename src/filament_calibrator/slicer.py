@@ -68,7 +68,7 @@ def slice_tower(
                        ``--max-fan-speed`` and ``--min-fan-speed``).
     nozzle_temp:       Nozzle temperature in °C (passed as
                        ``--temperature`` and ``--first-layer-temperature``).
-                       Should be the tower's *high_temp* so PrusaSlicer's
+                       Should be the tower's *start_temp* so PrusaSlicer's
                        start G-code heats to the correct initial temperature.
 
     Returns

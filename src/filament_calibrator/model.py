@@ -78,15 +78,15 @@ class TowerConfig:
 
     Attributes
     ----------
-    high_temp:    Highest temperature (bottom tier), in °C.
-    temp_jump:    Temperature decrease per tier, in °C.
+    start_temp:   Starting temperature (bottom tier), in °C.
+    temp_step:    Temperature decrease per tier, in °C.
     num_tiers:    Number of temperature tiers.
     filament_type: Label for filament type (e.g. ``"PLA"``).
     brand_top:    Optional brand label on top of tower.
     brand_bottom: Optional brand label on bottom of base.
     """
-    high_temp: int = 220
-    temp_jump: int = 10
+    start_temp: int = 220
+    temp_step: int = 10
     num_tiers: int = 9
     filament_type: str = "PLA"
     brand_top: str = ""
@@ -100,7 +100,7 @@ class TowerConfig:
 
 def tier_temperature(config: TowerConfig, tier_index: int) -> int:
     """Return the temperature for *tier_index* (0 = bottom = hottest)."""
-    return config.high_temp - tier_index * config.temp_jump
+    return config.start_temp - tier_index * config.temp_step
 
 
 def total_height(config: TowerConfig) -> float:

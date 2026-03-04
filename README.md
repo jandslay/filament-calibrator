@@ -72,13 +72,13 @@ All preset values can be overridden with explicit CLI flags.
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--filament-type` | `PLA` | Filament type (preset name or custom) |
-| `--high-temp` | from preset `temp_max` | Highest temperature (bottom tier) |
-| `--low-temp` | from preset `temp_min` | Lowest temperature (top tier) |
-| `--temp-jump` | `5` | Temperature decrease per tier (deg C) |
+| `--start-temp` | from preset `temp_max` | Highest temperature (bottom tier) |
+| `--end-temp` | from preset `temp_min` | Lowest temperature (top tier) |
+| `--temp-step` | `5` | Temperature decrease per tier (deg C) |
 | `--brand-top` | | Optional brand label on top |
 | `--brand-bottom` | | Optional brand label on bottom |
 
-Tier count is computed automatically: `(high_temp - low_temp) / temp_jump + 1`,
+Tier count is computed automatically: `(start_temp - end_temp) / temp_step + 1`,
 validated to a maximum of 10.
 
 ### Slicer Options
@@ -137,7 +137,7 @@ output-dir = "./output"
 PETG tower with 5-degree steps:
 
 ```bash
-temperature-tower --filament-type PETG --temp-jump 5 --no-upload
+temperature-tower --filament-type PETG --temp-step 5 --no-upload
 ```
 
 Custom range for ABS:
@@ -145,9 +145,9 @@ Custom range for ABS:
 ```bash
 temperature-tower \
   --filament-type ABS \
-  --high-temp 270 \
-  --low-temp 240 \
-  --temp-jump 5 \
+  --start-temp 270 \
+  --end-temp 240 \
+  --temp-step 5 \
   --bed-temp 110 \
   --no-upload \
   --output-dir ./abs-tower

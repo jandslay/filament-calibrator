@@ -39,27 +39,27 @@ def build_parser() -> argparse.ArgumentParser:
         "--filament-type", type=str, default="PLA",
         help=(
             f"Filament type. Known presets ({type_names}) set defaults "
-            "for --high-temp, --bed-temp, and --fan-speed automatically. "
+            "for --start-temp, --bed-temp, and --fan-speed automatically. "
             "Custom names are accepted but require explicit temperatures. "
             "Default: PLA"
         ),
     )
     model.add_argument(
-        "--high-temp", type=int, default=_UNSET,
+        "--start-temp", type=int, default=_UNSET,
         help=(
             "Highest temperature in °C (bottom tier). "
             "Default: from filament preset temp_max."
         ),
     )
     model.add_argument(
-        "--low-temp", type=int, default=_UNSET,
+        "--end-temp", type=int, default=_UNSET,
         help=(
             "Lowest temperature in °C (top tier). "
             "Default: from filament preset temp_min."
         ),
     )
     model.add_argument(
-        "--temp-jump", type=int, default=5,
+        "--temp-step", type=int, default=5,
         help="Temperature decrease per tier in °C. Default: 5",
     )
     model.add_argument(
@@ -174,72 +174,72 @@ def _resolve_output_dir(output_dir: Optional[str]) -> Path:
 def resolve_preset(args: argparse.Namespace) -> Dict[str, object]:
     """Look up the filament preset and return resolved settings.
 
-    Returns a dict with keys ``high_temp``, ``low_temp``, ``bed_temp``,
+    Returns a dict with keys ``start_temp``, ``end_temp``, ``bed_temp``,
     ``fan_speed``.  Values come from the preset when the user did not
     supply explicit CLI overrides.
 
     Preset ``temp_max`` / ``temp_min`` are used directly as the default
-    high and low temperatures.
+    start and end temperatures.
     """
     filament_key = args.filament_type.upper()
     preset = gl.FILAMENT_PRESETS.get(filament_key)
 
     if preset is not None:
-        default_high = int(preset["temp_max"])
-        default_low = int(preset["temp_min"])
+        default_start = int(preset["temp_max"])
+        default_end = int(preset["temp_min"])
         default_bed = int(preset["bed"])
         default_fan = int(preset["fan"])
     else:
-        default_high = 230
-        default_low = 190
+        default_start = 230
+        default_end = 190
         default_bed = 60
         default_fan = 100
 
     return {
-        "high_temp": args.high_temp if args.high_temp is not _UNSET else default_high,
-        "low_temp": args.low_temp if args.low_temp is not _UNSET else default_low,
+        "start_temp": args.start_temp if args.start_temp is not _UNSET else default_start,
+        "end_temp": args.end_temp if args.end_temp is not _UNSET else default_end,
         "bed_temp": args.bed_temp if args.bed_temp is not _UNSET else default_bed,
         "fan_speed": args.fan_speed if args.fan_speed is not _UNSET else default_fan,
     }
 
 
-def _compute_num_tiers(high_temp: int, low_temp: int, temp_jump: int) -> int:
+def _compute_num_tiers(start_temp: int, end_temp: int, temp_step: int) -> int:
     """Compute the number of tiers from a temperature range.
 
-    Validates that *high_temp* > *low_temp*, that the range is evenly
-    divisible by *temp_jump*, and that the result is at most 10 tiers.
+    Validates that *start_temp* > *end_temp*, that the range is evenly
+    divisible by *temp_step*, and that the result is at most 10 tiers.
     Calls :func:`sys.exit` with a clear message on validation failure.
     """
-    if high_temp <= low_temp:
+    if start_temp <= end_temp:
         sys.exit(
-            "error: --high-temp must be greater than --low-temp "
-            f"(got {high_temp} and {low_temp})"
+            "error: --start-temp must be greater than --end-temp "
+            f"(got {start_temp} and {end_temp})"
         )
-    spread = high_temp - low_temp
-    if spread % temp_jump != 0:
+    spread = start_temp - end_temp
+    if spread % temp_step != 0:
         sys.exit(
             f"error: temperature range {spread}°C "
-            f"is not evenly divisible by --temp-jump {temp_jump}"
+            f"is not evenly divisible by --temp-step {temp_step}"
         )
-    num_tiers = spread // temp_jump + 1
+    num_tiers = spread // temp_step + 1
     if num_tiers > 10:
         sys.exit(
             f"error: computed {num_tiers} tiers exceeds maximum of 10 "
-            f"(range {high_temp}→{low_temp}°C, step {temp_jump})"
+            f"(range {start_temp}→{end_temp}°C, step {temp_step})"
         )
     return num_tiers
 
 
 def _build_tower_config(
     args: argparse.Namespace,
-    high_temp: int,
-    low_temp: int,
+    start_temp: int,
+    end_temp: int,
 ) -> TowerConfig:
     """Build a TowerConfig from parsed CLI arguments."""
-    num_tiers = _compute_num_tiers(high_temp, low_temp, args.temp_jump)
+    num_tiers = _compute_num_tiers(start_temp, end_temp, args.temp_step)
     return TowerConfig(
-        high_temp=high_temp,
-        temp_jump=args.temp_jump,
+        start_temp=start_temp,
+        temp_step=args.temp_step,
         num_tiers=num_tiers,
         filament_type=args.filament_type,
         brand_top=args.brand_top,
@@ -267,23 +267,23 @@ def run(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     resolved = resolve_preset(args)
-    high_temp: int = resolved["high_temp"]
-    low_temp: int = resolved["low_temp"]
+    start_temp: int = resolved["start_temp"]
+    end_temp: int = resolved["end_temp"]
     bed_temp: int = resolved["bed_temp"]
     fan_speed: int = resolved["fan_speed"]
 
-    config = _build_tower_config(args, high_temp, low_temp)
+    config = _build_tower_config(args, start_temp, end_temp)
     out_dir = _resolve_output_dir(args.output_dir)
     print(
         f"Filament: {config.filament_type}  "
-        f"Range: {high_temp}→{low_temp}°C  "
+        f"Range: {start_temp}→{end_temp}°C  "
         f"Bed: {bed_temp}°C  Fan: {fan_speed}%"
     )
 
     # --- Step 1: Generate STL ---
     stl_name = (
         f"temp_tower_{config.filament_type}"
-        f"_{config.high_temp}_{config.temp_jump}x{config.num_tiers}.stl"
+        f"_{config.start_temp}_{config.temp_step}x{config.num_tiers}.stl"
     )
     stl_path = str(out_dir / stl_name)
     print(f"Generating model → {stl_path}")
@@ -300,7 +300,7 @@ def run(args: argparse.Namespace) -> None:
         extra_args=args.extra_slicer_args,
         bed_temp=bed_temp,
         fan_speed=fan_speed,
-        nozzle_temp=high_temp,
+        nozzle_temp=start_temp,
     )
     if not result.ok:
         print(f"PrusaSlicer failed (exit {result.returncode}):", file=sys.stderr)
@@ -312,8 +312,8 @@ def run(args: argparse.Namespace) -> None:
     print(f"Inserting temperatures → {final_gcode_path}")
     gf = gl.load(raw_gcode_path)
     tiers = compute_temp_tiers(
-        high_temp=config.high_temp,
-        temp_jump=config.temp_jump,
+        start_temp=config.start_temp,
+        temp_step=config.temp_step,
         num_tiers=config.num_tiers,
     )
     gf.lines = insert_temperatures(gf.lines, tiers)
