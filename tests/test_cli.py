@@ -52,12 +52,14 @@ class TestBuildParser:
         assert args.config_ini is None
         assert args.prusaslicer_path is None
         assert args.extra_slicer_args is None
+        assert args.bed_center is None
         assert args.printer_url is None
         assert args.api_key is None
         assert args.no_upload is False
         assert args.print_after_upload is False
         assert args.output_dir is None
         assert args.keep_files is False
+        assert args.verbose is False
 
     def test_config_flag_default(self):
         p = build_parser()
@@ -84,12 +86,14 @@ class TestBuildParser:
             "--fan-speed", "30",
             "--config-ini", "/path/to/config.ini",
             "--prusaslicer-path", "/usr/bin/ps",
+            "--bed-center", "90,90",
             "--printer-url", "http://10.0.0.1",
             "--api-key", "test-key",
             "--no-upload",
             "--print-after-upload",
             "--output-dir", "/tmp/out",
             "--keep-files",
+            "--verbose",
             "--config", "/path/to/config.toml",
             "--extra-slicer-args", "--nozzle-diameter", "0.4",
         ])
@@ -103,6 +107,7 @@ class TestBuildParser:
         assert args.fan_speed == 30
         assert args.config_ini == "/path/to/config.ini"
         assert args.prusaslicer_path == "/usr/bin/ps"
+        assert args.bed_center == "90,90"
         assert args.extra_slicer_args == ["--nozzle-diameter", "0.4"]
         assert args.printer_url == "http://10.0.0.1"
         assert args.api_key == "test-key"
@@ -110,6 +115,7 @@ class TestBuildParser:
         assert args.print_after_upload is True
         assert args.output_dir == "/tmp/out"
         assert args.keep_files is True
+        assert args.verbose is True
         assert args.config == "/path/to/config.toml"
 
     def test_known_types(self):
@@ -130,6 +136,7 @@ class TestApplyConfig:
         args = argparse.Namespace(
             printer_url=None, api_key=None, prusaslicer_path=None,
             config_ini=None, filament_type="PLA", output_dir=None,
+            bed_center=None,
         )
         config = {
             "printer_url": "http://10.0.0.1",
@@ -146,6 +153,7 @@ class TestApplyConfig:
             printer_url="http://cli.local", api_key=None,
             prusaslicer_path=None, config_ini=None,
             filament_type="PETG", output_dir=None,
+            bed_center=None,
         )
         config = {
             "printer_url": "http://toml.local",
@@ -161,6 +169,7 @@ class TestApplyConfig:
         args = argparse.Namespace(
             printer_url=None, api_key=None, prusaslicer_path=None,
             config_ini=None, filament_type="PLA", output_dir=None,
+            bed_center=None,
         )
         config = {"unknown_key": "value"}
         _apply_config(args, config)
@@ -170,6 +179,7 @@ class TestApplyConfig:
         args = argparse.Namespace(
             printer_url=None, api_key=None, prusaslicer_path=None,
             config_ini=None, filament_type="PLA", output_dir=None,
+            bed_center=None,
         )
         _apply_config(args, {})
         assert args.printer_url is None
@@ -179,6 +189,7 @@ class TestApplyConfig:
         args = argparse.Namespace(
             printer_url=None, api_key=None, prusaslicer_path=None,
             config_ini=None, filament_type="PLA", output_dir=None,
+            bed_center=None,
         )
         config = {
             "printer_url": "http://10.0.0.1",
@@ -187,6 +198,7 @@ class TestApplyConfig:
             "config_ini": "/path/to/profile.ini",
             "filament_type": "ABS",
             "output_dir": "/tmp/out",
+            "bed_center": "90,90",
         }
         _apply_config(args, config)
         assert args.printer_url == "http://10.0.0.1"
@@ -195,6 +207,7 @@ class TestApplyConfig:
         assert args.config_ini == "/path/to/profile.ini"
         assert args.filament_type == "ABS"
         assert args.output_dir == "/tmp/out"
+        assert args.bed_center == "90,90"
 
 
 class TestArgparseDefaults:
@@ -447,11 +460,11 @@ class TestRun:
             filament_type="PLA", brand_top="", brand_bottom="",
             bed_temp=_UNSET, fan_speed=_UNSET,
             config_ini=None, prusaslicer_path=None,
-            extra_slicer_args=None,
+            extra_slicer_args=None, bed_center=None,
             printer_url=None, api_key=None,
             no_upload=True, print_after_upload=False,
             output_dir=str(tmp_path), keep_files=False,
-            config=None,
+            config=None, verbose=False,
         )
         defaults.update(overrides)
         return argparse.Namespace(**defaults)
@@ -702,6 +715,194 @@ class TestRun:
         tower_config = gen_call[0][0]
         assert tower_config.filament_type == "ABS"
 
+    @patch("filament_calibrator.cli.gl.save")
+    @patch("filament_calibrator.cli.gl.load")
+    @patch("filament_calibrator.cli.insert_temperatures")
+    @patch("filament_calibrator.cli.compute_temp_tiers")
+    @patch("filament_calibrator.cli.slice_tower")
+    @patch("filament_calibrator.cli.generate_tower_stl")
+    def test_bed_center_passed_to_slicer(
+        self, mock_gen, mock_slice, mock_tiers,
+        mock_insert, mock_load, mock_save, tmp_path
+    ):
+        mock_gen.return_value = str(tmp_path / "tower.stl")
+        mock_slice.return_value = MagicMock(ok=True)
+        mock_tiers.return_value = []
+        mock_load.return_value = MagicMock(lines=[])
+        mock_insert.return_value = []
+
+        args = self._make_args(tmp_path, bed_center="90,90")
+        run(args)
+
+        slice_kwargs = mock_slice.call_args[1]
+        assert slice_kwargs["bed_center"] == "90,90"
+
+    @patch("filament_calibrator.cli.gl.save")
+    @patch("filament_calibrator.cli.gl.load")
+    @patch("filament_calibrator.cli.insert_temperatures")
+    @patch("filament_calibrator.cli.compute_temp_tiers")
+    @patch("filament_calibrator.cli.slice_tower")
+    @patch("filament_calibrator.cli.generate_tower_stl")
+    def test_verbose_output(
+        self, mock_gen, mock_slice, mock_tiers,
+        mock_insert, mock_load, mock_save, tmp_path, capsys
+    ):
+        mock_gen.return_value = str(tmp_path / "tower.stl")
+        mock_slice.return_value = MagicMock(
+            ok=True, cmd=["prusa-slicer", "--slice"], stdout="", stderr=""
+        )
+        mock_tiers.return_value = [
+            MagicMock(z_start=0.0, z_end=10.0, temp=230),
+        ]
+        mock_load.return_value = MagicMock(lines=[])
+        mock_insert.return_value = []
+
+        args = self._make_args(tmp_path, verbose=True)
+        run(args)
+
+        captured = capsys.readouterr()
+        assert "[DEBUG]" in captured.out
+        assert "No config file loaded" in captured.out
+        assert "Filament preset 'PLA' found" in captured.out
+        assert "start_temp=230" in captured.out
+        assert "Bed center:" in captured.out
+        assert "PrusaSlicer command:" in captured.out
+        assert "Temperature tiers:" in captured.out
+
+    @patch("filament_calibrator.cli.gl.save")
+    @patch("filament_calibrator.cli.gl.load")
+    @patch("filament_calibrator.cli.insert_temperatures")
+    @patch("filament_calibrator.cli.compute_temp_tiers")
+    @patch("filament_calibrator.cli.slice_tower")
+    @patch("filament_calibrator.cli.generate_tower_stl")
+    def test_verbose_shows_slicer_stdout(
+        self, mock_gen, mock_slice, mock_tiers,
+        mock_insert, mock_load, mock_save, tmp_path, capsys
+    ):
+        mock_gen.return_value = str(tmp_path / "tower.stl")
+        mock_slice.return_value = MagicMock(
+            ok=True, cmd=["prusa-slicer"],
+            stdout="Slicing complete in 3.2s", stderr=""
+        )
+        mock_tiers.return_value = []
+        mock_load.return_value = MagicMock(lines=[])
+        mock_insert.return_value = []
+
+        args = self._make_args(tmp_path, verbose=True)
+        run(args)
+
+        captured = capsys.readouterr()
+        assert "PrusaSlicer stdout: Slicing complete in 3.2s" in captured.out
+
+    @patch("filament_calibrator.cli.gl.save")
+    @patch("filament_calibrator.cli.gl.load")
+    @patch("filament_calibrator.cli.insert_temperatures")
+    @patch("filament_calibrator.cli.compute_temp_tiers")
+    @patch("filament_calibrator.cli.slice_tower")
+    @patch("filament_calibrator.cli.generate_tower_stl")
+    def test_no_verbose_no_debug(
+        self, mock_gen, mock_slice, mock_tiers,
+        mock_insert, mock_load, mock_save, tmp_path, capsys
+    ):
+        mock_gen.return_value = str(tmp_path / "tower.stl")
+        mock_slice.return_value = MagicMock(ok=True)
+        mock_tiers.return_value = []
+        mock_load.return_value = MagicMock(lines=[])
+        mock_insert.return_value = []
+
+        args = self._make_args(tmp_path, verbose=False)
+        run(args)
+
+        captured = capsys.readouterr()
+        assert "[DEBUG]" not in captured.out
+
+    @patch("filament_calibrator.cli.gl.save")
+    @patch("filament_calibrator.cli.gl.load")
+    @patch("filament_calibrator.cli.insert_temperatures")
+    @patch("filament_calibrator.cli.compute_temp_tiers")
+    @patch("filament_calibrator.cli.slice_tower")
+    @patch("filament_calibrator.cli.generate_tower_stl")
+    def test_verbose_shows_config_file(
+        self, mock_gen, mock_slice, mock_tiers,
+        mock_insert, mock_load, mock_save, tmp_path, capsys
+    ):
+        cfg = tmp_path / "test.toml"
+        cfg.write_text('filament-type = "PLA"\n')
+
+        mock_gen.return_value = str(tmp_path / "tower.stl")
+        mock_slice.return_value = MagicMock(
+            ok=True, cmd=["prusa-slicer"], stdout="", stderr=""
+        )
+        mock_tiers.return_value = []
+        mock_load.return_value = MagicMock(lines=[])
+        mock_insert.return_value = []
+
+        args = self._make_args(tmp_path, verbose=True, config=str(cfg))
+        run(args)
+
+        captured = capsys.readouterr()
+        assert "Config file:" in captured.out
+        assert str(cfg) in captured.out
+        assert "Config values:" in captured.out
+
+    @patch("filament_calibrator.cli.gl.prusalink_upload")
+    @patch("filament_calibrator.cli.gl.save")
+    @patch("filament_calibrator.cli.gl.load")
+    @patch("filament_calibrator.cli.insert_temperatures")
+    @patch("filament_calibrator.cli.compute_temp_tiers")
+    @patch("filament_calibrator.cli.slice_tower")
+    @patch("filament_calibrator.cli.generate_tower_stl")
+    def test_verbose_upload(
+        self, mock_gen, mock_slice, mock_tiers,
+        mock_insert, mock_load, mock_save, mock_upload, tmp_path, capsys
+    ):
+        mock_gen.return_value = str(tmp_path / "tower.stl")
+        mock_slice.return_value = MagicMock(
+            ok=True, cmd=["prusa-slicer"], stdout="", stderr=""
+        )
+        mock_tiers.return_value = []
+        mock_load.return_value = MagicMock(lines=[])
+        mock_insert.return_value = []
+        mock_upload.return_value = "tower.gcode"
+
+        args = self._make_args(
+            tmp_path, verbose=True,
+            no_upload=False,
+            printer_url="http://192.168.1.100",
+            api_key="key123",
+            print_after_upload=True,
+        )
+        run(args)
+
+        captured = capsys.readouterr()
+        assert "Upload target: http://192.168.1.100" in captured.out
+        assert "Print after upload: True" in captured.out
+
+    @patch("filament_calibrator.cli.gl.save")
+    @patch("filament_calibrator.cli.gl.load")
+    @patch("filament_calibrator.cli.insert_temperatures")
+    @patch("filament_calibrator.cli.compute_temp_tiers")
+    @patch("filament_calibrator.cli.slice_tower")
+    @patch("filament_calibrator.cli.generate_tower_stl")
+    def test_verbose_unknown_filament(
+        self, mock_gen, mock_slice, mock_tiers,
+        mock_insert, mock_load, mock_save, tmp_path, capsys
+    ):
+        mock_gen.return_value = str(tmp_path / "tower.stl")
+        mock_slice.return_value = MagicMock(
+            ok=True, cmd=["prusa-slicer"], stdout="", stderr=""
+        )
+        mock_tiers.return_value = []
+        mock_load.return_value = MagicMock(lines=[])
+        mock_insert.return_value = []
+
+        args = self._make_args(tmp_path, verbose=True, filament_type="EXOTIC")
+        run(args)
+
+        captured = capsys.readouterr()
+        assert "not in presets" in captured.out
+        assert "fallback defaults" in captured.out
+
 
 # ---------------------------------------------------------------------------
 # main
@@ -730,6 +931,24 @@ class TestMain:
         args = mock_run.call_args[0][0]
         assert args.bed_temp == 90
         assert args.fan_speed == 60
+
+    @patch("filament_calibrator.cli.run")
+    def test_bed_center(self, mock_run):
+        main(["--bed-center", "90,90"])
+        args = mock_run.call_args[0][0]
+        assert args.bed_center == "90,90"
+
+    @patch("filament_calibrator.cli.run")
+    def test_verbose_flag(self, mock_run):
+        main(["-v"])
+        args = mock_run.call_args[0][0]
+        assert args.verbose is True
+
+    @patch("filament_calibrator.cli.run")
+    def test_verbose_long_flag(self, mock_run):
+        main(["--verbose"])
+        args = mock_run.call_args[0][0]
+        assert args.verbose is True
 
 
 # ---------------------------------------------------------------------------

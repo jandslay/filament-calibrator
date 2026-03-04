@@ -25,6 +25,7 @@ CONFIG_KEYS: frozenset[str] = frozenset({
     "config-ini",
     "filament-type",
     "output-dir",
+    "bed-center",
 })
 
 #: Map TOML key names (hyphenated) to argparse attribute names (underscored).

@@ -12,9 +12,9 @@ from typing import Dict, List, Optional
 
 import gcode_lib as gl
 
-from filament_calibrator.config import load_config
+from filament_calibrator.config import _find_config_path, load_config
 from filament_calibrator.model import TowerConfig, generate_tower_stl
-from filament_calibrator.slicer import slice_tower
+from filament_calibrator.slicer import DEFAULT_BED_CENTER, slice_tower
 from filament_calibrator.tempinsert import compute_temp_tiers, insert_temperatures
 
 # Sentinel used to detect whether the user explicitly supplied a value.
@@ -94,6 +94,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Explicit path to PrusaSlicer executable.",
     )
     slicer.add_argument(
+        "--bed-center", type=str, default=None,
+        help=(
+            "Bed centre as X,Y in mm (e.g. 125,105). Used to position the "
+            "model on the print bed. Default: 125,105 (Prusa MK-series)."
+        ),
+    )
+    slicer.add_argument(
         "--extra-slicer-args", type=str, nargs=argparse.REMAINDER, default=None,
         help="Additional raw CLI arguments for PrusaSlicer (must be last).",
     )
@@ -138,6 +145,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Keep intermediate files (STL, raw G-code).",
     )
 
+    # --- Verbosity ---
+    p.add_argument(
+        "-v", "--verbose", action="store_true", default=False,
+        help="Show detailed debug output.",
+    )
+
     return p
 
 
@@ -149,6 +162,7 @@ _ARGPARSE_DEFAULTS: Dict[str, object] = {
     "config_ini": None,
     "filament_type": "PLA",
     "output_dir": None,
+    "bed_center": None,
 }
 
 
@@ -278,6 +292,14 @@ def run(args: argparse.Namespace) -> None:
     toml_config = load_config(args.config)
     _apply_config(args, toml_config)
 
+    if args.verbose:
+        cfg_path = _find_config_path(args.config)
+        if cfg_path is not None:
+            print(f"[DEBUG] Config file: {cfg_path}")
+            print(f"[DEBUG] Config values: {toml_config}")
+        else:
+            print("[DEBUG] No config file loaded")
+
     # Fail fast: validate upload requirements before expensive pipeline steps.
     if not args.no_upload and (not args.printer_url or not args.api_key):
         print("Error: --printer-url and --api-key are required for upload.",
@@ -290,8 +312,25 @@ def run(args: argparse.Namespace) -> None:
     bed_temp: int = resolved["bed_temp"]
     fan_speed: int = resolved["fan_speed"]
 
+    if args.verbose:
+        filament_key = args.filament_type.upper()
+        preset = gl.FILAMENT_PRESETS.get(filament_key)
+        if preset is not None:
+            print(f"[DEBUG] Filament preset '{filament_key}' found")
+        else:
+            print(f"[DEBUG] Filament type '{filament_key}' not in presets, "
+                  "using fallback defaults")
+        print(f"[DEBUG] Resolved: start_temp={start_temp} end_temp={end_temp} "
+              f"bed_temp={bed_temp} fan_speed={fan_speed}")
+
     config = _build_tower_config(args, start_temp, end_temp)
     out_dir = _resolve_output_dir(args.output_dir)
+
+    if args.verbose:
+        print(f"[DEBUG] Tower: {config.num_tiers} tiers, "
+              f"{start_temp}→{end_temp}°C, step={config.temp_step}°C")
+        print(f"[DEBUG] Output directory: {out_dir}")
+
     print(
         f"Filament: {config.filament_type}  "
         f"Range: {start_temp}→{end_temp}°C  "
@@ -310,6 +349,10 @@ def run(args: argparse.Namespace) -> None:
     # --- Step 2: Slice ---
     raw_gcode_path = str(out_dir / stl_name.replace(".stl", "_raw.gcode"))
     print(f"Slicing → {raw_gcode_path}")
+    if args.verbose:
+        effective_center = args.bed_center or f"{DEFAULT_BED_CENTER} (default)"
+        print(f"[DEBUG] Bed center: {effective_center}")
+
     result = slice_tower(
         stl_path=stl_path,
         output_gcode_path=raw_gcode_path,
@@ -319,7 +362,13 @@ def run(args: argparse.Namespace) -> None:
         bed_temp=bed_temp,
         fan_speed=fan_speed,
         nozzle_temp=start_temp,
+        bed_center=args.bed_center,
     )
+    if args.verbose:
+        print(f"[DEBUG] PrusaSlicer command: {' '.join(result.cmd)}")
+        if result.stdout.strip():
+            print(f"[DEBUG] PrusaSlicer stdout: {result.stdout.strip()}")
+
     if not result.ok:
         print(f"PrusaSlicer failed (exit {result.returncode}):", file=sys.stderr)
         print(result.stderr, file=sys.stderr)
@@ -334,6 +383,11 @@ def run(args: argparse.Namespace) -> None:
         temp_step=config.temp_step,
         num_tiers=config.num_tiers,
     )
+    if args.verbose:
+        print("[DEBUG] Temperature tiers:")
+        for t in tiers:
+            print(f"[DEBUG]   Z {t.z_start:.1f}–{t.z_end:.1f} mm → {t.temp}°C")
+
     gf.lines = insert_temperatures(gf.lines, tiers)
     gl.save(gf, final_gcode_path)
 
@@ -344,6 +398,9 @@ def run(args: argparse.Namespace) -> None:
 
     # --- Step 4: Upload ---
     if not args.no_upload:
+        if args.verbose:
+            print(f"[DEBUG] Upload target: {args.printer_url}")
+            print(f"[DEBUG] Print after upload: {args.print_after_upload}")
         print(f"Uploading to {args.printer_url}")
         filename = gl.prusalink_upload(
             base_url=args.printer_url,

@@ -106,6 +106,10 @@ api-key = "your-prusalink-api-key"
 # prusaslicer-path = "/usr/bin/prusa-slicer"
 config-ini = "/path/to/printer-profile.ini"
 
+# Bed centre in mm — default is 125,105 (Prusa MK-series).
+# For Prusa MINI, use 90,90.
+# bed-center = "125,105"
+
 # Defaults
 filament-type = "PLA"
 output-dir = "./output"
@@ -188,6 +192,7 @@ must be evenly divisible by `--temp-step`.
 | `--fan-speed` | from preset | Fan speed (0-100%) |
 | `--config-ini` | | PrusaSlicer `.ini` config file |
 | `--prusaslicer-path` | auto-detect | Path to PrusaSlicer executable |
+| `--bed-center` | `125,105` | Bed centre as X,Y in mm (see below) |
 | `--extra-slicer-args` | | Additional PrusaSlicer CLI args (must be last) |
 
 ### Printer Options

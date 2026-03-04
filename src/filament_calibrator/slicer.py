@@ -22,6 +22,10 @@ DEFAULT_SLICER_ARGS: Dict[str, str] = {
     "fill-density": "15%",
     "skirts": "1",
 }
+
+# Default bed centre for Prusa MK-series printers (250 × 210 mm bed).
+# Used with PrusaSlicer's --center flag to place the model on the bed.
+DEFAULT_BED_CENTER: str = "125,105"
 """Slicer defaults applied when no ``--config-ini`` is supplied.
 
 These produce a reasonable temp tower slice with 0.2mm layers, 2 perimeters,
@@ -44,6 +48,7 @@ def slice_tower(
     bed_temp: Optional[int] = None,
     fan_speed: Optional[int] = None,
     nozzle_temp: Optional[int] = None,
+    bed_center: Optional[str] = None,
 ) -> gl.RunResult:
     """Slice the temperature tower STL into G-code.
 
@@ -70,6 +75,10 @@ def slice_tower(
                        ``--temperature`` and ``--first-layer-temperature``).
                        Should be the tower's *start_temp* so PrusaSlicer's
                        start G-code heats to the correct initial temperature.
+    bed_center:        Bed centre as ``"X,Y"`` (e.g. ``"125,105"``).
+                       Passed as ``--center`` so PrusaSlicer places the
+                       model in the middle of the bed.  Defaults to
+                       :data:`DEFAULT_BED_CENTER` when ``None``.
 
     Returns
     -------
@@ -83,7 +92,9 @@ def slice_tower(
     """
     exe = gl.find_prusaslicer_executable(explicit_path=prusaslicer_path)
 
-    cli_extra: List[str] = []
+    cli_extra: List[str] = [
+        f"--center={bed_center or DEFAULT_BED_CENTER}",
+    ]
     if config_ini is None:
         for key, val in DEFAULT_SLICER_ARGS.items():
             cli_extra.append(f"--{key}={val}")

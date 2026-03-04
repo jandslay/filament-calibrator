@@ -10,6 +10,11 @@ api-key = "your-prusalink-api-key"
 # prusaslicer-path = "/usr/bin/prusa-slicer"
 config-ini = "/path/to/printer-profile.ini"
 
+# Bed centre in mm (X,Y) — used to position the model on the print bed.
+# Default is 125,105 (Prusa MK-series 250×210 mm bed).
+# For Prusa MINI, use 90,90.
+# bed-center = "125,105"
+
 # Defaults
 filament-type = "PLA"
 output-dir = "./output"

@@ -8,6 +8,7 @@ import pytest
 import gcode_lib as gl
 
 from filament_calibrator.slicer import (
+    DEFAULT_BED_CENTER,
     DEFAULT_SLICER_ARGS,
     slice_tower,
 )
@@ -32,6 +33,17 @@ class TestDefaultSlicerArgs:
         # support-material is a boolean flag in PrusaSlicer; omitting it
         # means "disabled" (the default), so we don't include it.
         assert "support-material" not in DEFAULT_SLICER_ARGS
+
+
+class TestDefaultBedCenter:
+    def test_default_bed_center_format(self):
+        assert "," in DEFAULT_BED_CENTER
+        x, y = DEFAULT_BED_CENTER.split(",")
+        assert int(x) > 0
+        assert int(y) > 0
+
+    def test_default_is_mk_series(self):
+        assert DEFAULT_BED_CENTER == "125,105"
 
 
 # ---------------------------------------------------------------------------
@@ -281,3 +293,51 @@ class TestSliceTower:
         bed_idx = req.extra_args.index("--bed-temperature=60")
         custom_idx = req.extra_args.index("--custom")
         assert custom_idx > bed_idx
+
+    # --- bed_center ---
+
+    @patch("filament_calibrator.slicer.gl.slice_model")
+    @patch("filament_calibrator.slicer.gl.find_prusaslicer_executable")
+    def test_default_bed_center(self, mock_find, mock_slice):
+        """Default bed center is used when bed_center is None."""
+        mock_find.return_value = "/usr/bin/prusa-slicer"
+        mock_slice.return_value = gl.RunResult(
+            cmd=[], returncode=0, stdout="", stderr=""
+        )
+
+        slice_tower("/tmp/tower.stl", "/tmp/tower.gcode",
+                     config_ini="/config.ini")
+
+        req = mock_slice.call_args[0][1]
+        assert f"--center={DEFAULT_BED_CENTER}" in req.extra_args
+
+    @patch("filament_calibrator.slicer.gl.slice_model")
+    @patch("filament_calibrator.slicer.gl.find_prusaslicer_executable")
+    def test_custom_bed_center(self, mock_find, mock_slice):
+        """Custom bed_center overrides the default."""
+        mock_find.return_value = "/usr/bin/prusa-slicer"
+        mock_slice.return_value = gl.RunResult(
+            cmd=[], returncode=0, stdout="", stderr=""
+        )
+
+        slice_tower("/tmp/tower.stl", "/tmp/tower.gcode",
+                     config_ini="/config.ini", bed_center="90,90")
+
+        req = mock_slice.call_args[0][1]
+        assert "--center=90,90" in req.extra_args
+        assert f"--center={DEFAULT_BED_CENTER}" not in req.extra_args
+
+    @patch("filament_calibrator.slicer.gl.slice_model")
+    @patch("filament_calibrator.slicer.gl.find_prusaslicer_executable")
+    def test_center_is_first_arg(self, mock_find, mock_slice):
+        """--center appears before other slicer args."""
+        mock_find.return_value = "/usr/bin/prusa-slicer"
+        mock_slice.return_value = gl.RunResult(
+            cmd=[], returncode=0, stdout="", stderr=""
+        )
+
+        slice_tower("/tmp/tower.stl", "/tmp/tower.gcode",
+                     bed_temp=60)
+
+        req = mock_slice.call_args[0][1]
+        assert req.extra_args[0] == f"--center={DEFAULT_BED_CENTER}"
