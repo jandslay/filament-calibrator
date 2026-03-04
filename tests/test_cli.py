@@ -47,6 +47,7 @@ class TestBuildParser:
         assert args.filament_type == "PLA"
         assert args.brand_top == ""
         assert args.brand_bottom == ""
+        assert args.nozzle_size == 0.4
         assert args.bed_temp is _UNSET
         assert args.fan_speed is _UNSET
         assert args.config_ini is None
@@ -82,6 +83,7 @@ class TestBuildParser:
             "--filament-type", "PETG",
             "--brand-top", "BrandA",
             "--brand-bottom", "BrandB",
+            "--nozzle-size", "0.6",
             "--bed-temp", "85",
             "--fan-speed", "30",
             "--config-ini", "/path/to/config.ini",
@@ -103,6 +105,7 @@ class TestBuildParser:
         assert args.filament_type == "PETG"
         assert args.brand_top == "BrandA"
         assert args.brand_bottom == "BrandB"
+        assert args.nozzle_size == 0.6
         assert args.bed_temp == 85
         assert args.fan_speed == 30
         assert args.config_ini == "/path/to/config.ini"
@@ -136,7 +139,7 @@ class TestApplyConfig:
         args = argparse.Namespace(
             printer_url=None, api_key=None, prusaslicer_path=None,
             config_ini=None, filament_type="PLA", output_dir=None,
-            bed_center=None,
+            bed_center=None, nozzle_size=0.4,
         )
         config = {
             "printer_url": "http://10.0.0.1",
@@ -189,7 +192,7 @@ class TestApplyConfig:
         args = argparse.Namespace(
             printer_url=None, api_key=None, prusaslicer_path=None,
             config_ini=None, filament_type="PLA", output_dir=None,
-            bed_center=None,
+            bed_center=None, nozzle_size=0.4,
         )
         config = {
             "printer_url": "http://10.0.0.1",
@@ -199,6 +202,7 @@ class TestApplyConfig:
             "filament_type": "ABS",
             "output_dir": "/tmp/out",
             "bed_center": "90,90",
+            "nozzle_size": 0.6,
         }
         _apply_config(args, config)
         assert args.printer_url == "http://10.0.0.1"
@@ -208,6 +212,7 @@ class TestApplyConfig:
         assert args.filament_type == "ABS"
         assert args.output_dir == "/tmp/out"
         assert args.bed_center == "90,90"
+        assert args.nozzle_size == 0.6
 
 
 class TestArgparseDefaults:
@@ -458,6 +463,7 @@ class TestRun:
         defaults = dict(
             start_temp=_UNSET, end_temp=_UNSET, temp_step=5,
             filament_type="PLA", brand_top="", brand_bottom="",
+            nozzle_size=0.4,
             bed_temp=_UNSET, fan_speed=_UNSET,
             config_ini=None, prusaslicer_path=None,
             extra_slicer_args=None, bed_center=None,

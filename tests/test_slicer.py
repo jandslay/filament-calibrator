@@ -374,6 +374,73 @@ class TestSliceTower:
         req = mock_slice.call_args[0][1]
         assert f"--thumbnails={DEFAULT_THUMBNAILS}" in req.extra_args
 
+    # --- nozzle_diameter, layer_height, extrusion_width ---
+
+    @patch("filament_calibrator.slicer.gl.slice_model")
+    @patch("filament_calibrator.slicer.gl.find_prusaslicer_executable")
+    def test_nozzle_diameter_passed(self, mock_find, mock_slice):
+        mock_find.return_value = "/usr/bin/prusa-slicer"
+        mock_slice.return_value = gl.RunResult(
+            cmd=[], returncode=0, stdout="", stderr=""
+        )
+
+        slice_tower("/tmp/tower.stl", "/tmp/tower.gcode",
+                     nozzle_diameter=0.6)
+
+        req = mock_slice.call_args[0][1]
+        assert "--nozzle-diameter=0.6" in req.extra_args
+
+    @patch("filament_calibrator.slicer.gl.slice_model")
+    @patch("filament_calibrator.slicer.gl.find_prusaslicer_executable")
+    def test_layer_height_overrides_defaults(self, mock_find, mock_slice):
+        """Custom layer_height replaces DEFAULT_SLICER_ARGS entries."""
+        mock_find.return_value = "/usr/bin/prusa-slicer"
+        mock_slice.return_value = gl.RunResult(
+            cmd=[], returncode=0, stdout="", stderr=""
+        )
+
+        slice_tower("/tmp/tower.stl", "/tmp/tower.gcode",
+                     layer_height=0.3)
+
+        req = mock_slice.call_args[0][1]
+        assert "--layer-height=0.3" in req.extra_args
+        assert "--first-layer-height=0.3" in req.extra_args
+        # Defaults should NOT be present
+        assert "--layer-height=0.2" not in req.extra_args
+        assert "--first-layer-height=0.2" not in req.extra_args
+
+    @patch("filament_calibrator.slicer.gl.slice_model")
+    @patch("filament_calibrator.slicer.gl.find_prusaslicer_executable")
+    def test_extrusion_width_passed(self, mock_find, mock_slice):
+        mock_find.return_value = "/usr/bin/prusa-slicer"
+        mock_slice.return_value = gl.RunResult(
+            cmd=[], returncode=0, stdout="", stderr=""
+        )
+
+        slice_tower("/tmp/tower.stl", "/tmp/tower.gcode",
+                     extrusion_width=0.68)
+
+        req = mock_slice.call_args[0][1]
+        assert "--extrusion-width=0.68" in req.extra_args
+
+    @patch("filament_calibrator.slicer.gl.slice_model")
+    @patch("filament_calibrator.slicer.gl.find_prusaslicer_executable")
+    def test_none_nozzle_layer_extrusion_not_added(self, mock_find, mock_slice):
+        """None values for nozzle/layer/extrusion are not added."""
+        mock_find.return_value = "/usr/bin/prusa-slicer"
+        mock_slice.return_value = gl.RunResult(
+            cmd=[], returncode=0, stdout="", stderr=""
+        )
+
+        slice_tower("/tmp/tower.stl", "/tmp/tower.gcode",
+                     config_ini="/config.ini",
+                     nozzle_diameter=None, layer_height=None,
+                     extrusion_width=None)
+
+        req = mock_slice.call_args[0][1]
+        assert not any(a.startswith("--nozzle-diameter") for a in req.extra_args)
+        assert not any(a.startswith("--extrusion-width") for a in req.extra_args)
+
 
 # ---------------------------------------------------------------------------
 # VASE_MODE_SLICER_ARGS
@@ -612,3 +679,33 @@ class TestSliceFlowSpecimen:
 
         req = mock_slice.call_args[0][1]
         assert f"--thumbnails={DEFAULT_THUMBNAILS}" in req.extra_args
+
+    # --- nozzle_diameter ---
+
+    @patch("filament_calibrator.slicer.gl.slice_model")
+    @patch("filament_calibrator.slicer.gl.find_prusaslicer_executable")
+    def test_nozzle_diameter_passed(self, mock_find, mock_slice):
+        mock_find.return_value = "/usr/bin/prusa-slicer"
+        mock_slice.return_value = gl.RunResult(
+            cmd=[], returncode=0, stdout="", stderr=""
+        )
+
+        slice_flow_specimen("/tmp/specimen.stl", "/tmp/specimen.gcode",
+                            nozzle_diameter=0.6)
+
+        req = mock_slice.call_args[0][1]
+        assert "--nozzle-diameter=0.6" in req.extra_args
+
+    @patch("filament_calibrator.slicer.gl.slice_model")
+    @patch("filament_calibrator.slicer.gl.find_prusaslicer_executable")
+    def test_nozzle_diameter_none_not_added(self, mock_find, mock_slice):
+        mock_find.return_value = "/usr/bin/prusa-slicer"
+        mock_slice.return_value = gl.RunResult(
+            cmd=[], returncode=0, stdout="", stderr=""
+        )
+
+        slice_flow_specimen("/tmp/specimen.stl", "/tmp/specimen.gcode",
+                            nozzle_diameter=None)
+
+        req = mock_slice.call_args[0][1]
+        assert not any(a.startswith("--nozzle-diameter") for a in req.extra_args)

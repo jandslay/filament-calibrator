@@ -44,8 +44,9 @@ class TestBuildParser:
         assert args.step == 0.5
         assert args.level_height == 1.0
         assert args.filament_type == "PLA"
-        assert args.layer_height == 0.2
-        assert args.extrusion_width == 0.45
+        assert args.nozzle_size == 0.4
+        assert args.layer_height is _UNSET
+        assert args.extrusion_width is _UNSET
         assert args.bed_temp is _UNSET
         assert args.fan_speed is _UNSET
         assert args.nozzle_temp is _UNSET
@@ -248,7 +249,8 @@ class TestRun:
         defaults = dict(
             start_speed=5.0, end_speed=10.0, step=5.0,
             level_height=1.0, filament_type="PLA",
-            layer_height=0.2, extrusion_width=0.45,
+            nozzle_size=0.4,
+            layer_height=_UNSET, extrusion_width=_UNSET,
             bed_temp=_UNSET, fan_speed=_UNSET, nozzle_temp=_UNSET,
             config_ini=None, prusaslicer_path=None,
             extra_slicer_args=None, bed_center=None,

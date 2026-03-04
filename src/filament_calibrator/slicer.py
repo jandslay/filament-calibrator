@@ -71,6 +71,9 @@ def slice_tower(
     fan_speed: Optional[int] = None,
     nozzle_temp: Optional[int] = None,
     bed_center: Optional[str] = None,
+    nozzle_diameter: Optional[float] = None,
+    layer_height: Optional[float] = None,
+    extrusion_width: Optional[float] = None,
 ) -> gl.RunResult:
     """Slice the temperature tower STL into G-code.
 
@@ -101,6 +104,13 @@ def slice_tower(
                        Passed as ``--center`` so PrusaSlicer places the
                        model in the middle of the bed.  Defaults to
                        :data:`DEFAULT_BED_CENTER` when ``None``.
+    nozzle_diameter:   Nozzle diameter in mm (passed as
+                       ``--nozzle-diameter``).
+    layer_height:      Layer height in mm.  When provided and *config_ini*
+                       is ``None``, overrides the default from
+                       :data:`DEFAULT_SLICER_ARGS`.
+    extrusion_width:   Extrusion width in mm (passed as
+                       ``--extrusion-width``).
 
     Returns
     -------
@@ -120,8 +130,20 @@ def slice_tower(
         f"--thumbnails={DEFAULT_THUMBNAILS}",
     ]
     if config_ini is None:
+        # When caller provides layer_height, skip the dict defaults for
+        # layer-height and first-layer-height so they aren't duplicated.
+        skip = {"layer-height", "first-layer-height"} if layer_height is not None else set()
         for key, val in DEFAULT_SLICER_ARGS.items():
-            cli_extra.append(f"--{key}={val}")
+            if key not in skip:
+                cli_extra.append(f"--{key}={val}")
+        if layer_height is not None:
+            cli_extra.append(f"--layer-height={layer_height}")
+            cli_extra.append(f"--first-layer-height={layer_height}")
+
+    if nozzle_diameter is not None:
+        cli_extra.append(f"--nozzle-diameter={nozzle_diameter}")
+    if extrusion_width is not None:
+        cli_extra.append(f"--extrusion-width={extrusion_width}")
 
     if nozzle_temp is not None:
         cli_extra.append(f"--temperature={nozzle_temp}")
@@ -157,6 +179,7 @@ def slice_flow_specimen(
     bed_temp: Optional[int] = None,
     fan_speed: Optional[int] = None,
     bed_center: Optional[str] = None,
+    nozzle_diameter: Optional[float] = None,
 ) -> gl.RunResult:
     """Slice a flow-rate specimen STL in spiral-vase mode.
 
@@ -179,6 +202,8 @@ def slice_flow_specimen(
     fan_speed:         Fan speed 0–100 %.
     bed_center:        Bed centre as ``"X,Y"`` (defaults to
                        :data:`DEFAULT_BED_CENTER`).
+    nozzle_diameter:   Nozzle diameter in mm (passed as
+                       ``--nozzle-diameter``).
 
     Returns
     -------
@@ -205,6 +230,8 @@ def slice_flow_specimen(
         cli_extra.append(f"--layer-height={layer_height}")
         cli_extra.append(f"--extrusion-width={extrusion_width}")
 
+    if nozzle_diameter is not None:
+        cli_extra.append(f"--nozzle-diameter={nozzle_diameter}")
     if nozzle_temp is not None:
         cli_extra.append(f"--temperature={nozzle_temp}")
         cli_extra.append(f"--first-layer-temperature={nozzle_temp}")

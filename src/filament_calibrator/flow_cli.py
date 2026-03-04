@@ -72,15 +72,33 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
 
+    # --- Nozzle options ---
+    nozzle = p.add_argument_group("nozzle options")
+    nozzle.add_argument(
+        "--nozzle-size", type=float, default=0.4,
+        help=(
+            "Nozzle diameter in mm. Sets defaults for "
+            "--layer-height (nozzle × 0.5) and --extrusion-width "
+            "(nozzle × 1.125) when they are not explicitly provided. "
+            "Default: 0.4"
+        ),
+    )
+
     # --- Slicer options ---
     slicer = p.add_argument_group("slicer options")
     slicer.add_argument(
-        "--layer-height", type=float, default=0.2,
-        help="Slicer layer height in mm. Default: 0.2",
+        "--layer-height", type=float, default=_UNSET,
+        help=(
+            "Slicer layer height in mm. Default: derived from "
+            "--nozzle-size (nozzle × 0.5)."
+        ),
     )
     slicer.add_argument(
-        "--extrusion-width", type=float, default=0.45,
-        help="Slicer extrusion width in mm. Default: 0.45",
+        "--extrusion-width", type=float, default=_UNSET,
+        help=(
+            "Slicer extrusion width in mm. Default: derived from "
+            "--nozzle-size (nozzle × 1.125)."
+        ),
     )
     slicer.add_argument(
         "--bed-temp", type=int, default=_UNSET,
@@ -270,6 +288,17 @@ def run(args: argparse.Namespace) -> None:
     bed_temp: int = resolved["bed_temp"]
     fan_speed: int = resolved["fan_speed"]
 
+    # Derive layer height and extrusion width from nozzle size.
+    nozzle_size: float = args.nozzle_size
+    layer_height: float = (
+        args.layer_height if args.layer_height is not _UNSET
+        else round(nozzle_size * 0.5, 2)
+    )
+    extrusion_width: float = (
+        args.extrusion_width if args.extrusion_width is not _UNSET
+        else round(nozzle_size * 1.125, 2)
+    )
+
     if args.verbose:
         filament_key = args.filament_type.upper()
         preset = gl.FILAMENT_PRESETS.get(filament_key)
@@ -280,6 +309,8 @@ def run(args: argparse.Namespace) -> None:
                   "using fallback defaults")
         print(f"[DEBUG] Resolved: nozzle_temp={nozzle_temp} bed_temp={bed_temp} "
               f"fan_speed={fan_speed}")
+        print(f"[DEBUG] Nozzle: {nozzle_size} mm → "
+              f"layer_height={layer_height} extrusion_width={extrusion_width}")
 
     config = FlowSpecimenConfig(
         num_levels=num_levels,
@@ -296,8 +327,9 @@ def run(args: argparse.Namespace) -> None:
 
     print(
         f"Filament: {config.filament_type}  "
+        f"Nozzle: {nozzle_size} mm  "
         f"Flow: {args.start_speed}→{args.end_speed} mm³/s  "
-        f"Nozzle: {nozzle_temp}°C  Bed: {bed_temp}°C  Fan: {fan_speed}%"
+        f"Temp: {nozzle_temp}°C  Bed: {bed_temp}°C  Fan: {fan_speed}%"
     )
 
     # --- Step 1: Generate STL ---
@@ -319,8 +351,8 @@ def run(args: argparse.Namespace) -> None:
     result = slice_flow_specimen(
         stl_path=stl_path,
         output_gcode_path=raw_gcode_path,
-        layer_height=args.layer_height,
-        extrusion_width=args.extrusion_width,
+        layer_height=layer_height,
+        extrusion_width=extrusion_width,
         config_ini=args.config_ini,
         prusaslicer_path=args.prusaslicer_path,
         extra_args=args.extra_slicer_args,
@@ -328,6 +360,7 @@ def run(args: argparse.Namespace) -> None:
         bed_temp=bed_temp,
         fan_speed=fan_speed,
         bed_center=args.bed_center,
+        nozzle_diameter=nozzle_size,
     )
     if args.verbose:
         print(f"[DEBUG] PrusaSlicer command: {' '.join(result.cmd)}")
@@ -348,8 +381,8 @@ def run(args: argparse.Namespace) -> None:
         flow_step=args.step,
         num_levels=num_levels,
         level_height=args.level_height,
-        layer_height=args.layer_height,
-        extrusion_width=args.extrusion_width,
+        layer_height=layer_height,
+        extrusion_width=extrusion_width,
     )
     if args.verbose:
         print("[DEBUG] Flow levels:")

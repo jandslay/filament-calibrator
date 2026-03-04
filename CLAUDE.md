@@ -61,13 +61,20 @@ override the preset.  Unknown filament names fall back to safe defaults
 `slicer.py` contains two sets of defaults:
 
 - `DEFAULT_SLICER_ARGS` — for temperature tower slicing (2 perimeters,
-  15% infill, 0.2mm layers).
+  15% infill).  Layer height and extrusion width are derived from
+  `--nozzle-size` (default 0.4mm → 0.2mm layers, 0.45mm extrusion width).
 - `VASE_MODE_SLICER_ARGS` — for flow specimen slicing (1 perimeter, no infill,
   5mm brim, spiral-vase mode).  `layer-height` and `extrusion-width` are
-  passed explicitly by `slice_flow_specimen()`.
+  passed explicitly by `slice_flow_specimen()`, derived from `--nozzle-size`
+  unless the user provides explicit values.
 
-Both functions pass `--center` and `--bed-shape` for Prusa MK-series bed
+Both functions accept `nozzle_diameter` to pass `--nozzle-diameter` to
+PrusaSlicer, and pass `--center` and `--bed-shape` for Prusa MK-series bed
 geometry (250×210mm).
+
+**Nozzle-size derivation formulas** (matching PrusaSlicer auto-width):
+- `layer_height = nozzle_size × 0.5` → 0.4→0.2, 0.6→0.3, 0.8→0.4
+- `extrusion_width = nozzle_size × 1.125` → 0.4→0.45, 0.6→0.68, 0.8→0.9
 
 ## Code Conventions
 

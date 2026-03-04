@@ -113,6 +113,10 @@ api-key = "your-prusalink-api-key"
 # For Prusa MINI, use 90,90.
 # bed-center = "125,105"
 
+# Nozzle size in mm — derives layer height (nozzle × 0.5) and
+# extrusion width (nozzle × 1.125). Default: 0.4
+# nozzle-size = 0.4
+
 # Defaults
 filament-type = "PLA"
 output-dir = "./output"
@@ -165,8 +169,8 @@ temperature-tower --no-upload --output-dir ./output --keep-files
    tests (45/35 deg), bridge holes, cones, and engraved temperature labels.
 
 2. **Slicing** — PrusaSlicer CLI slices the STL using either a user-supplied
-   `.ini` profile or built-in defaults (0.2mm layers, 2 perimeters, 15%
-   infill, no supports).
+   `.ini` profile or built-in defaults (layer height and extrusion width
+   derived from `--nozzle-size`, 2 perimeters, 15% infill, no supports).
 
 3. **Temperature insertion** — `M104` commands are inserted at the G-code
    layer boundaries corresponding to each tier, so the printer changes
@@ -192,6 +196,12 @@ Tier count is computed automatically: `(start_temp - end_temp) / temp_step + 1`,
 validated to a maximum of 10. Temperatures must be within 150--350 deg C,
 `--start-temp` must be at least `--end-temp + --temp-step`, and the range
 must be evenly divisible by `--temp-step`.
+
+#### Nozzle Options
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--nozzle-size` | `0.4` | Nozzle diameter in mm — derives layer height (`nozzle × 0.5`) and extrusion width (`nozzle × 1.125`) |
 
 #### Slicer Options
 
@@ -241,6 +251,12 @@ temperature-tower \
   --bed-temp 110 \
   --no-upload \
   --output-dir ./abs-tower
+```
+
+With a 0.6mm nozzle (auto-sets 0.3mm layer height, 0.68mm extrusion width):
+
+```bash
+temperature-tower --nozzle-size 0.6 --no-upload
 ```
 
 Use a PrusaSlicer profile:
@@ -318,6 +334,12 @@ of levels cannot exceed 50.
 | `--filament-type` | `PLA` | Filament type — sets nozzle temp, bed temp, and fan speed from preset |
 | `--level-height` | `1.0` | Height per flow level in mm |
 
+#### Nozzle Options
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--nozzle-size` | `0.4` | Nozzle diameter in mm — derives layer height and extrusion width (see below) |
+
 #### Slicer Options
 
 | Flag | Default | Description |
@@ -325,8 +347,8 @@ of levels cannot exceed 50.
 | `--nozzle-temp` | from preset | Nozzle temperature (deg C) — overrides preset |
 | `--bed-temp` | from preset | Bed temperature (deg C) — overrides preset |
 | `--fan-speed` | from preset | Fan speed (0--100%) — overrides preset |
-| `--layer-height` | `0.2` | Slicer layer height (mm) |
-| `--extrusion-width` | `0.45` | Slicer extrusion width (mm) |
+| `--layer-height` | from `--nozzle-size` | Slicer layer height in mm (default: nozzle × 0.5) |
+| `--extrusion-width` | from `--nozzle-size` | Slicer extrusion width in mm (default: nozzle × 1.125) |
 | `--config-ini` | | PrusaSlicer `.ini` config file |
 | `--prusaslicer-path` | auto-detect | Path to PrusaSlicer executable |
 | `--bed-center` | `125,105` | Bed centre as X,Y in mm |
@@ -367,6 +389,15 @@ volumetric-flow \
   --filament-type PETG \
   --start-speed 3 --end-speed 12 --step 1 \
   --nozzle-temp 240 --bed-temp 80 \
+  --no-upload
+```
+
+With a 0.6mm nozzle (auto-sets 0.3mm layer height, 0.68mm extrusion width):
+
+```bash
+volumetric-flow \
+  --start-speed 5 --end-speed 20 --step 1 \
+  --nozzle-size 0.6 \
   --no-upload
 ```
 

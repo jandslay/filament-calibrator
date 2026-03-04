@@ -62,7 +62,7 @@ class TestConstants:
         expected = {
             "printer-url", "api-key", "prusaslicer-path",
             "config-ini", "filament-type", "output-dir",
-            "bed-center",
+            "bed-center", "nozzle-size",
         }
         assert CONFIG_KEYS == expected
 
@@ -74,6 +74,7 @@ class TestConstants:
         assert _KEY_TO_ATTR["prusaslicer-path"] == "prusaslicer_path"
         assert _KEY_TO_ATTR["output-dir"] == "output_dir"
         assert _KEY_TO_ATTR["bed-center"] == "bed_center"
+        assert _KEY_TO_ATTR["nozzle-size"] == "nozzle_size"
 
     def test_key_to_attr_covers_all_keys(self):
         assert set(_KEY_TO_ATTR.keys()) == CONFIG_KEYS

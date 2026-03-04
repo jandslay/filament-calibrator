@@ -15,6 +15,10 @@ api-key = "your-prusalink-api-key"
 # For Prusa MINI, use 90,90.
 # bed-center = "125,105"
 
+# Nozzle size in mm — derives layer height (nozzle × 0.5) and
+# extrusion width (nozzle × 1.125). Default: 0.4
+# nozzle-size = 0.4
+
 # Defaults
 filament-type = "PLA"
 output-dir = "./output"

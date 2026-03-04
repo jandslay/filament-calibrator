@@ -75,6 +75,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional brand label on the bottom of the base.",
     )
 
+    # --- Nozzle options ---
+    nozzle = p.add_argument_group("nozzle options")
+    nozzle.add_argument(
+        "--nozzle-size", type=float, default=0.4,
+        help=(
+            "Nozzle diameter in mm. Sets appropriate defaults for "
+            "layer height (nozzle × 0.5) and extrusion width "
+            "(nozzle × 1.125). Default: 0.4"
+        ),
+    )
+
     # --- Slicer options ---
     slicer = p.add_argument_group("slicer options")
     slicer.add_argument(
@@ -163,6 +174,7 @@ _ARGPARSE_DEFAULTS: Dict[str, object] = {
     "filament_type": "PLA",
     "output_dir": None,
     "bed_center": None,
+    "nozzle_size": 0.4,
 }
 
 
@@ -331,8 +343,18 @@ def run(args: argparse.Namespace) -> None:
               f"{start_temp}→{end_temp}°C, step={config.temp_step}°C")
         print(f"[DEBUG] Output directory: {out_dir}")
 
+    # Derive layer height and extrusion width from nozzle size.
+    nozzle_size: float = args.nozzle_size
+    layer_height = round(nozzle_size * 0.5, 2)
+    extrusion_width = round(nozzle_size * 1.125, 2)
+
+    if args.verbose:
+        print(f"[DEBUG] Nozzle: {nozzle_size} mm → "
+              f"layer_height={layer_height} extrusion_width={extrusion_width}")
+
     print(
         f"Filament: {config.filament_type}  "
+        f"Nozzle: {nozzle_size} mm  "
         f"Range: {start_temp}→{end_temp}°C  "
         f"Bed: {bed_temp}°C  Fan: {fan_speed}%"
     )
@@ -363,6 +385,9 @@ def run(args: argparse.Namespace) -> None:
         fan_speed=fan_speed,
         nozzle_temp=start_temp,
         bed_center=args.bed_center,
+        nozzle_diameter=nozzle_size,
+        layer_height=layer_height,
+        extrusion_width=extrusion_width,
     )
     if args.verbose:
         print(f"[DEBUG] PrusaSlicer command: {' '.join(result.cmd)}")
