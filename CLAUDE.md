@@ -14,6 +14,7 @@ src/filament_calibrator/
   __init__.py       # Package init, __version__
   __main__.py       # python -m filament_calibrator support
   cli.py            # argparse CLI, pipeline orchestration
+  config.py         # TOML config file loading
   model.py          # CadQuery parametric 3D model generation
   slicer.py         # PrusaSlicer CLI wrapper with defaults
   tempinsert.py     # G-code temperature command insertion
@@ -24,11 +25,13 @@ src/filament_calibrator/
 - **cadquery** (>= 2.4): Parametric CAD model generation (OCCT kernel)
 - **gcode-lib** (>= 1.7.0): G-code parsing, PrusaSlicer integration,
   PrusaLink API, filament presets. Located at `/Users/rlewis/git/gcode-lib`.
+- **tomli** (>= 2.0, Python < 3.11 only): TOML parsing fallback
 
 ### Pipeline Flow
 
-`cli.run()` orchestrates: resolve_preset -> generate_tower_stl -> slice_tower
--> load G-code -> insert_temperatures -> save -> optional PrusaLink upload.
+`cli.run()` orchestrates: load_config -> apply_config -> resolve_preset ->
+generate_tower_stl -> slice_tower -> load G-code -> insert_temperatures ->
+save -> optional PrusaLink upload.
 
 ## Code Conventions
 
@@ -70,3 +73,5 @@ Entry point: `temperature-tower` -> `filament_calibrator.cli:main`
 - **Change slicer defaults**: Edit `DEFAULT_SLICER_ARGS` in `slicer.py`.
 - **Add a new calibration tool**: Create a new module + CLI entry point in
   `pyproject.toml [project.scripts]`.
+- **Add a new config key**: Add to `CONFIG_KEYS` in `config.py`, add
+  corresponding entry in `_ARGPARSE_DEFAULTS` in `cli.py`.

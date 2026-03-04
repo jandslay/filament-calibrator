@@ -59,11 +59,9 @@ Each preset provides: recommended hotend temperature, bed temperature, fan
 speed, retraction distance, safe temperature range (`temp_min`/`temp_max`),
 print speed, and enclosure recommendation.
 
-When you specify `--filament-type PLA` (the default), the tool automatically
-calculates a temperature range that centres the preset's recommended
-temperature in the middle of the tower.
-
-Formula: `high_temp = preset_hotend + (num_tiers // 2) * temp_jump`
+When you specify `--filament-type PLA` (the default), the tool uses the
+preset's `temp_max` and `temp_min` as the default high and low temperatures.
+The number of tiers is computed automatically from the range and step size.
 
 All preset values can be overridden with explicit CLI flags.
 
@@ -74,11 +72,14 @@ All preset values can be overridden with explicit CLI flags.
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--filament-type` | `PLA` | Filament type (preset name or custom) |
-| `--high-temp` | from preset | Highest temperature (bottom tier) |
-| `--temp-jump` | `10` | Temperature decrease per tier (deg C) |
-| `--num-tiers` | `9` | Number of temperature tiers |
+| `--high-temp` | from preset `temp_max` | Highest temperature (bottom tier) |
+| `--low-temp` | from preset `temp_min` | Lowest temperature (top tier) |
+| `--temp-jump` | `5` | Temperature decrease per tier (deg C) |
 | `--brand-top` | | Optional brand label on top |
 | `--brand-bottom` | | Optional brand label on bottom |
+
+Tier count is computed automatically: `(high_temp - low_temp) / temp_jump + 1`,
+validated to a maximum of 10.
 
 ### Slicer Options
 
@@ -106,6 +107,31 @@ All preset values can be overridden with explicit CLI flags.
 | `--output-dir` | temp dir | Directory for output files |
 | `--keep-files` | `false` | Keep intermediate STL and raw G-code |
 
+### Configuration File
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--config` | auto-detect | Path to a TOML config file |
+
+Commonly reused settings can be saved in a TOML config file instead of passing
+them on every invocation. The tool looks for config files in this order:
+
+1. `--config <path>` (explicit)
+2. `./filament-calibrator.toml` (project-local)
+3. `~/.config/filament-calibrator/config.toml` (user config)
+
+CLI arguments always override config file values. See
+`filament-calibrator.example.toml` for the supported keys:
+
+```toml
+printer-url = "http://192.168.1.100"
+api-key = "your-prusalink-api-key"
+prusaslicer-path = "/usr/bin/prusa-slicer"
+config-ini = "/path/to/printer-profile.ini"
+filament-type = "PLA"
+output-dir = "./output"
+```
+
 ## Examples
 
 PETG tower with 5-degree steps:
@@ -114,13 +140,13 @@ PETG tower with 5-degree steps:
 temperature-tower --filament-type PETG --temp-jump 5 --no-upload
 ```
 
-Custom range for ABS with enclosure reminder:
+Custom range for ABS:
 
 ```bash
 temperature-tower \
   --filament-type ABS \
   --high-temp 270 \
-  --num-tiers 7 \
+  --low-temp 240 \
   --temp-jump 5 \
   --bed-temp 110 \
   --no-upload \
