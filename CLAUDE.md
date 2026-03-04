@@ -23,8 +23,8 @@ src/filament_calibrator/
 ### Key Dependencies
 
 - **cadquery** (>= 2.4): Parametric CAD model generation (OCCT kernel)
-- **gcode-lib** (>= 1.7.0): G-code parsing, PrusaSlicer integration,
-  PrusaLink API, filament presets. Located at `/Users/rlewis/git/gcode-lib`.
+- **gcode-lib** (>= 1.0.0): G-code parsing, PrusaSlicer integration,
+  PrusaLink API, filament presets. Published on PyPI.
 - **tomli** (>= 2.0, Python < 3.11 only): TOML parsing fallback
 
 ### Pipeline Flow
@@ -59,7 +59,6 @@ pytest tests/ --cov=src/filament_calibrator --cov-report=term-missing --cov-fail
 
 ```bash
 pip install -e .                    # editable install
-pip install -e /path/to/gcode-lib   # if gcode-lib not on PyPI
 ```
 
 Entry point: `temperature-tower` -> `filament_calibrator.cli:main`
