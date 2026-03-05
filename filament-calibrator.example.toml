@@ -5,6 +5,12 @@
 printer-url = "http://192.168.1.100"
 api-key = "your-prusalink-api-key"
 
+# Printer model — generates printer-specific start/end G-code for the
+# pressure-advance tool (when no config-ini is given). Also auto-sets
+# bed-center from the printer's known bed dimensions.
+# Supported: coreone, coreonel, mk4s, mini, xl (default: coreone)
+printer = "coreone"
+
 # Slicer setup
 # prusaslicer-path is only needed if PrusaSlicer is not on your PATH
 # prusaslicer-path = "/usr/bin/prusa-slicer"
@@ -12,7 +18,7 @@ api-key = "your-prusalink-api-key"
 
 # Bed centre in mm (X,Y) — used to position the model on the print bed.
 # Default is 125,105 (Prusa MK-series 250×210 mm bed).
-# For Prusa MINI, use 90,90.
+# Auto-set by printer if specified. For Prusa MINI, use 90,90.
 # bed-center = "125,105"
 
 # Nozzle size in mm — derives layer height (nozzle × 0.5) and

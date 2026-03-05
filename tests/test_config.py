@@ -62,7 +62,7 @@ class TestConstants:
         expected = {
             "printer-url", "api-key", "prusaslicer-path",
             "config-ini", "filament-type", "output-dir",
-            "bed-center", "nozzle-size",
+            "bed-center", "nozzle-size", "printer",
         }
         assert CONFIG_KEYS == expected
 

@@ -1,12 +1,11 @@
-"""Command-line interface for volumetric flow calibration.
+"""Command-line interface for pressure advance calibration.
 
-Orchestrates: model generation → vase-mode slicing → feedrate insertion → upload.
+Orchestrates: model generation → slicing → PA command insertion → upload.
 """
 from __future__ import annotations
 
 import argparse
 import sys
-import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -21,50 +20,70 @@ from filament_calibrator.cli import (
     _resolve_output_dir,
 )
 from filament_calibrator.config import _find_config_path, load_config
-from filament_calibrator.flow_insert import compute_flow_levels, insert_flow_rates
-from filament_calibrator.flow_model import FlowSpecimenConfig, generate_flow_specimen_stl
+from filament_calibrator.pa_insert import compute_pa_levels, insert_pa_commands
+from filament_calibrator.pa_model import (
+    TOWER_DEPTH,
+    TOWER_WIDTH,
+    PATowerConfig,
+    generate_pa_tower_stl,
+)
 from filament_calibrator.printer_gcode import (
     KNOWN_PRINTERS,
     compute_bed_center,
     compute_bed_shape,
+    render_end_gcode,
+    render_start_gcode,
     resolve_printer,
 )
 from filament_calibrator.slicer import (
     DEFAULT_BED_CENTER,
     DEFAULT_THUMBNAILS,
-    slice_flow_specimen,
+    slice_pa_specimen,
 )
 from filament_calibrator.thumbnail import inject_thumbnails
 
 
-# Maximum number of flow levels to prevent excessively tall prints.
+# Maximum number of PA levels to prevent excessively tall prints.
 MAX_LEVELS = 50
+
+# Valid firmware types for pressure advance commands.
+FIRMWARE_CHOICES = ("marlin", "klipper")
 
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the argument parser."""
     p = argparse.ArgumentParser(
-        prog="volumetric-flow",
+        prog="pressure-advance",
         description=(
-            "Generate, slice, and upload a volumetric flow calibration specimen. "
-            "The model is a serpentine wall printed in vase mode; print speed "
-            "increases at each height level to test maximum volumetric flow."
+            "Generate, slice, and upload a pressure advance calibration tower. "
+            "The model is a hollow rectangle with sharp corners; PA value "
+            "increases at each height level to find optimal pressure advance."
         ),
     )
 
-    # --- Flow options ---
-    flow = p.add_argument_group("flow options")
-    flow.add_argument(
-        "--start-speed", type=float, required=True,
-        help="Starting volumetric flow rate in mm³/s (lowest, bottom level).",
+    # --- PA options ---
+    pa = p.add_argument_group("pressure advance options")
+    pa.add_argument(
+        "--start-pa", type=float, required=True,
+        help="Starting PA value (bottom level).",
     )
-    flow.add_argument(
-        "--end-speed", type=float, required=True,
-        help="Ending volumetric flow rate in mm³/s (highest, top level).",
+    pa.add_argument(
+        "--end-pa", type=float, required=True,
+        help="Ending PA value (top level).",
     )
-    flow.add_argument(
-        "--step", type=float, required=True,
-        help="Flow rate increment per level in mm³/s.",
+    pa.add_argument(
+        "--pa-step", type=float, required=True,
+        help="PA value increment per level.",
+    )
+    pa.add_argument(
+        "--firmware", type=str, default="marlin",
+        choices=FIRMWARE_CHOICES,
+        help=(
+            "Firmware type for PA commands. "
+            "'marlin' uses M900 K<value>, "
+            "'klipper' uses SET_PRESSURE_ADVANCE ADVANCE=<value>. "
+            "Default: marlin"
+        ),
     )
 
     # --- Model options ---
@@ -72,7 +91,7 @@ def build_parser() -> argparse.ArgumentParser:
     model = p.add_argument_group("model options")
     model.add_argument(
         "--level-height", type=float, default=1.0,
-        help="Height per flow level in mm. Default: 1.0",
+        help="Height per PA level in mm. Default: 1.0",
     )
     model.add_argument(
         "--filament-type", type=str, default="PLA",
@@ -135,7 +154,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     slicer.add_argument(
         "--config-ini", type=str, default=None,
-        help="PrusaSlicer .ini config file. If omitted, built-in vase-mode defaults are used.",
+        help="PrusaSlicer .ini config file. If omitted, built-in defaults are used.",
     )
     slicer.add_argument(
         "--prusaslicer-path", type=str, default=None,
@@ -158,9 +177,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--printer", type=str, default="COREONE",
         help=(
-            f"Printer model for bed dimensions and metadata. "
+            f"Printer model for start/end G-code. "
             f"Available: {printer_names} (also accepts mk4 as alias for mk4s). "
-            "Auto-sets --bed-center and bed shape from the printer's preset."
+            "When set and no --config-ini is given, inserts printer-specific "
+            "start/end G-code (homing, mesh bed leveling, purge line, parking). "
+            "Also auto-sets --bed-center from the printer's bed dimensions."
         ),
     )
 
@@ -221,38 +242,38 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
-def _validate_flow_args(
-    start_speed: float,
-    end_speed: float,
-    step: float,
+def _validate_pa_args(
+    start_pa: float,
+    end_pa: float,
+    pa_step: float,
 ) -> int:
-    """Validate flow-rate arguments and return the number of levels.
+    """Validate PA arguments and return the number of levels.
 
     Calls :func:`sys.exit` on invalid input.
     """
-    if start_speed <= 0:
-        sys.exit(f"error: --start-speed must be positive (got {start_speed})")
-    if step <= 0:
-        sys.exit(f"error: --step must be positive (got {step})")
-    if end_speed <= start_speed:
+    if start_pa < 0:
+        sys.exit(f"error: --start-pa must be non-negative (got {start_pa})")
+    if pa_step <= 0:
+        sys.exit(f"error: --pa-step must be positive (got {pa_step})")
+    if end_pa <= start_pa:
         sys.exit(
-            f"error: --end-speed ({end_speed}) must be greater than "
-            f"--start-speed ({start_speed})"
+            f"error: --end-pa ({end_pa}) must be greater than "
+            f"--start-pa ({start_pa})"
         )
-    spread = end_speed - start_speed
+    spread = end_pa - start_pa
     # Allow small floating-point tolerance when checking divisibility.
-    remainder = spread % step
-    if remainder > 1e-9 and (step - remainder) > 1e-9:
+    remainder = spread % pa_step
+    if remainder > 1e-9 and (pa_step - remainder) > 1e-9:
         sys.exit(
-            f"error: flow range {spread} mm³/s is not evenly divisible "
-            f"by --step {step}"
+            f"error: PA range {spread} is not evenly divisible "
+            f"by --pa-step {pa_step}"
         )
-    num_levels = round(spread / step) + 1
+    num_levels = round(spread / pa_step) + 1
     if num_levels > MAX_LEVELS:
         sys.exit(
             f"error: computed {num_levels} levels exceeds maximum of "
-            f"{MAX_LEVELS} (range {start_speed}→{end_speed} mm³/s, "
-            f"step {step})"
+            f"{MAX_LEVELS} (range {start_pa}→{end_pa}, "
+            f"step {pa_step})"
         )
     return num_levels
 
@@ -282,12 +303,12 @@ def _resolve_preset(args: argparse.Namespace) -> Dict[str, object]:
 
 
 def run(args: argparse.Namespace) -> None:
-    """Execute the full volumetric-flow calibration pipeline.
+    """Execute the full pressure advance calibration pipeline.
 
-    1. Validate flow arguments.
-    2. Generate the serpentine specimen STL.
-    3. Slice in vase mode with PrusaSlicer.
-    4. Insert feedrate overrides into the G-code.
+    1. Validate PA arguments.
+    2. Generate the hollow rectangular tower STL.
+    3. Slice with PrusaSlicer.
+    4. Insert PA commands into the G-code.
     5. Upload to the printer (unless ``--no-upload``).
     """
     # Load TOML config and apply defaults.
@@ -308,9 +329,9 @@ def run(args: argparse.Namespace) -> None:
               file=sys.stderr)
         sys.exit(1)
 
-    # Validate flow args and compute level count.
-    num_levels = _validate_flow_args(
-        args.start_speed, args.end_speed, args.step,
+    # Validate PA args and compute level count.
+    num_levels = _validate_pa_args(
+        args.start_pa, args.end_pa, args.pa_step,
     )
 
     # Resolve filament preset for slicer settings.
@@ -318,15 +339,6 @@ def run(args: argparse.Namespace) -> None:
     nozzle_temp: int = resolved["nozzle_temp"]
     bed_temp: int = resolved["bed_temp"]
     fan_speed: int = resolved["fan_speed"]
-
-    # Resolve printer model for bed dimensions and metadata.
-    printer_name: Optional[str] = None
-    bed_shape: Optional[str] = None
-    if args.printer is not None:
-        printer_name = resolve_printer(args.printer)
-        if args.bed_center is None:
-            args.bed_center = compute_bed_center(printer_name)
-        bed_shape = compute_bed_shape(printer_name)
 
     # Derive layer height and extrusion width from nozzle size.
     nozzle_size: float = args.nozzle_size
@@ -338,6 +350,16 @@ def run(args: argparse.Namespace) -> None:
         args.extrusion_width if args.extrusion_width is not _UNSET
         else round(nozzle_size * 1.125, 2)
     )
+
+    # Resolve printer model for start/end G-code.
+    printer_name: Optional[str] = None
+    bed_shape: Optional[str] = None
+    if args.printer is not None:
+        printer_name = resolve_printer(args.printer)
+        # Auto-set bed center and shape from printer presets if not explicit.
+        if args.bed_center is None:
+            args.bed_center = compute_bed_center(printer_name)
+        bed_shape = compute_bed_shape(printer_name)
 
     if args.verbose:
         filament_key = args.filament_type.upper()
@@ -355,7 +377,7 @@ def run(args: argparse.Namespace) -> None:
             print(f"[DEBUG] Printer: {printer_name} "
                   f"(bed center: {args.bed_center})")
 
-    config = FlowSpecimenConfig(
+    config = PATowerConfig(
         num_levels=num_levels,
         level_height=args.level_height,
         filament_type=args.filament_type,
@@ -363,36 +385,68 @@ def run(args: argparse.Namespace) -> None:
     out_dir = _resolve_output_dir(args.output_dir)
 
     if args.verbose:
-        print(f"[DEBUG] Flow: {num_levels} levels, "
-              f"{args.start_speed}→{args.end_speed} mm³/s, "
-              f"step={args.step} mm³/s")
+        print(f"[DEBUG] PA: {num_levels} levels, "
+              f"{args.start_pa}→{args.end_pa}, "
+              f"step={args.pa_step}")
         print(f"[DEBUG] Output directory: {out_dir}")
 
     print(
         f"Filament: {config.filament_type}  "
         f"Nozzle: {nozzle_size} mm  "
-        f"Flow: {args.start_speed}→{args.end_speed} mm³/s  "
+        f"PA: {args.start_pa}→{args.end_pa} (step {args.pa_step})  "
+        f"Firmware: {args.firmware}  "
         f"Temp: {nozzle_temp}°C  Bed: {bed_temp}°C  Fan: {fan_speed}%"
     )
 
     # --- Step 1: Generate STL ---
     stl_name = (
-        f"flow_specimen_{config.filament_type}"
-        f"_{args.start_speed}_{args.step}x{num_levels}.stl"
+        f"pa_tower_{config.filament_type}"
+        f"_{args.start_pa}_{args.pa_step}x{num_levels}.stl"
     )
     stl_path = str(out_dir / stl_name)
     print(f"Generating model → {stl_path}")
-    generate_flow_specimen_stl(config, stl_path)
+    generate_pa_tower_stl(config, stl_path)
 
-    # --- Step 2: Slice in vase mode ---
+    # --- Step 2: Slice ---
     gcode_ext = _gcode_ext(args.ascii_gcode)
     raw_gcode_path = str(out_dir / stl_name.replace(".stl", f"_raw{gcode_ext}"))
-    print(f"Slicing (vase mode) → {raw_gcode_path}")
+    print(f"Slicing → {raw_gcode_path}")
     if args.verbose:
         effective_center = args.bed_center or f"{DEFAULT_BED_CENTER} (default)"
         print(f"[DEBUG] Bed center: {effective_center}")
 
-    result = slice_flow_specimen(
+    # Render printer-specific start/end G-code when --printer is set
+    # and no --config-ini is given (config.ini already has start/end gcode).
+    start_gcode: Optional[str] = None
+    end_gcode: Optional[str] = None
+    if printer_name is not None and args.config_ini is None:
+        total_height = num_levels * args.level_height
+        # Determine whether to use cooling fan during MBL.
+        filament_preset = gl.FILAMENT_PRESETS.get(
+            args.filament_type.upper()
+        )
+        use_cool_fan = True
+        if filament_preset is not None and filament_preset.get("enclosure"):
+            use_cool_fan = False
+
+        start_gcode = render_start_gcode(
+            printer_name,
+            nozzle_dia=nozzle_size,
+            bed_temp=bed_temp,
+            hotend_temp=nozzle_temp,
+            bed_center=args.bed_center or DEFAULT_BED_CENTER,
+            model_width=TOWER_WIDTH,
+            model_depth=TOWER_DEPTH,
+            cool_fan=use_cool_fan,
+        )
+        end_gcode = render_end_gcode(
+            printer_name,
+            max_layer_z=total_height,
+        )
+        if args.verbose:
+            print(f"[DEBUG] Rendered {printer_name} start/end G-code")
+
+    result = slice_pa_specimen(
         stl_path=stl_path,
         output_gcode_path=raw_gcode_path,
         layer_height=layer_height,
@@ -406,6 +460,8 @@ def run(args: argparse.Namespace) -> None:
         bed_center=args.bed_center,
         bed_shape=bed_shape,
         nozzle_diameter=nozzle_size,
+        start_gcode=start_gcode,
+        end_gcode=end_gcode,
         printer_model=printer_name,
         binary_gcode=not args.ascii_gcode,
     )
@@ -419,27 +475,31 @@ def run(args: argparse.Namespace) -> None:
         print(result.stderr, file=sys.stderr)
         sys.exit(1)
 
-    # --- Step 3: Insert flow-rate feedrates ---
+    # --- Step 3: Insert PA commands ---
     final_gcode_path = str(out_dir / stl_name.replace(".stl", gcode_ext))
-    print(f"Inserting flow rates → {final_gcode_path}")
+    print(f"Inserting PA commands → {final_gcode_path}")
     gf = gl.load(raw_gcode_path)
     inject_thumbnails(gf, stl_path, DEFAULT_THUMBNAILS, verbose=args.verbose)
-    levels = compute_flow_levels(
-        start_flow=args.start_speed,
-        flow_step=args.step,
+    levels = compute_pa_levels(
+        start_pa=args.start_pa,
+        pa_step=args.pa_step,
         num_levels=num_levels,
         level_height=args.level_height,
-        layer_height=layer_height,
-        extrusion_width=extrusion_width,
     )
     if args.verbose:
-        print("[DEBUG] Flow levels:")
+        print("[DEBUG] PA levels:")
         for lv in levels:
             print(f"[DEBUG]   Z {lv.z_start:.1f}–{lv.z_end:.1f} mm → "
-                  f"{lv.flow_rate:.1f} mm³/s (F{lv.feedrate:.0f})")
+                  f"PA {lv.pa_value:.4f}")
 
-    gf.lines = insert_flow_rates(gf.lines, levels)
+    gf.lines = insert_pa_commands(gf.lines, levels, firmware=args.firmware)
     gl.save(gf, final_gcode_path)
+
+    # Print PA level lookup table for the user.
+    print("\nPA value by height:")
+    for lv in levels:
+        print(f"  Z {lv.z_start:5.1f} - {lv.z_end:5.1f} mm  ->  PA {lv.pa_value:.4f}")
+    print(f"\nMeasure the height with the sharpest corners to find your optimal PA value.\n")
 
     # --- Clean up intermediate files ---
     if not args.keep_files:
