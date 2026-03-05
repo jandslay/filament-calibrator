@@ -13,6 +13,11 @@ from filament_calibrator.gui import (
     _fresh_output_dir,
     _open_directory_dialog,
     _open_file_dialog,
+    _osascript_directory_dialog,
+    _osascript_file_dialog,
+    _run_osascript,
+    _tkinter_directory_dialog,
+    _tkinter_file_dialog,
     build_flow_namespace,
     build_pa_namespace,
     build_temp_tower_namespace,
@@ -360,52 +365,24 @@ class TestFreshOutputDir:
 # ---------------------------------------------------------------------------
 
 class TestOpenFileDialog:
-    """Test _open_file_dialog() subprocess-based file picker."""
+    """Test _open_file_dialog() dispatches to the right backend."""
 
-    @patch("filament_calibrator.gui.subprocess.run")
-    def test_returns_selected_path(self, mock_run: MagicMock) -> None:
-        mock_run.return_value = MagicMock(stdout="/path/to/config.ini\n")
-        result = _open_file_dialog(title="Pick", filetypes=[("INI", "*.ini")])
-        assert result == "/path/to/config.ini"
-        mock_run.assert_called_once()
-        assert mock_run.call_args[0][0][0] == sys.executable
+    @patch("filament_calibrator.gui.platform.system", return_value="Darwin")
+    @patch("filament_calibrator.gui._osascript_file_dialog",
+           return_value="/mac/file.ini")
+    def test_macos_uses_osascript(self, mock_osa: MagicMock,
+                                  _mock_sys: MagicMock) -> None:
+        assert _open_file_dialog(title="P", filetypes=[("I", "*.ini")]) == \
+            "/mac/file.ini"
+        mock_osa.assert_called_once_with("P", [("I", "*.ini")])
 
-    @patch("filament_calibrator.gui.subprocess.run")
-    def test_returns_none_on_cancel(self, mock_run: MagicMock) -> None:
-        mock_run.return_value = MagicMock(stdout="\n")
-        assert _open_file_dialog() is None
-
-    @patch("filament_calibrator.gui.subprocess.run")
-    def test_returns_none_on_empty(self, mock_run: MagicMock) -> None:
-        mock_run.return_value = MagicMock(stdout="")
-        assert _open_file_dialog() is None
-
-    @patch("filament_calibrator.gui.subprocess.run")
-    def test_returns_none_on_timeout(self, mock_run: MagicMock) -> None:
-        mock_run.side_effect = subprocess.TimeoutExpired(cmd="x", timeout=120)
-        assert _open_file_dialog() is None
-
-    @patch("filament_calibrator.gui.subprocess.run")
-    def test_returns_none_on_os_error(self, mock_run: MagicMock) -> None:
-        mock_run.side_effect = OSError("no python")
-        assert _open_file_dialog() is None
-
-    @patch("filament_calibrator.gui.subprocess.run")
-    def test_returns_none_on_file_not_found(self, mock_run: MagicMock) -> None:
-        mock_run.side_effect = FileNotFoundError()
-        assert _open_file_dialog() is None
-
-    @patch("filament_calibrator.gui.subprocess.run")
-    def test_no_filetypes(self, mock_run: MagicMock) -> None:
-        mock_run.return_value = MagicMock(stdout="/some/file\n")
-        assert _open_file_dialog(title="Open") == "/some/file"
-
-    @patch("filament_calibrator.gui.subprocess.run")
-    def test_filetypes_in_script(self, mock_run: MagicMock) -> None:
-        mock_run.return_value = MagicMock(stdout="/x.ini\n")
-        _open_file_dialog(filetypes=[("INI files", "*.ini")])
-        script = mock_run.call_args[0][0][2]
-        assert "*.ini" in script
+    @patch("filament_calibrator.gui.platform.system", return_value="Linux")
+    @patch("filament_calibrator.gui._tkinter_file_dialog",
+           return_value="/linux/file")
+    def test_linux_uses_tkinter(self, mock_tk: MagicMock,
+                                _mock_sys: MagicMock) -> None:
+        assert _open_file_dialog(title="Open") == "/linux/file"
+        mock_tk.assert_called_once_with("Open", None)
 
 
 # ---------------------------------------------------------------------------
@@ -413,24 +390,194 @@ class TestOpenFileDialog:
 # ---------------------------------------------------------------------------
 
 class TestOpenDirectoryDialog:
-    """Test _open_directory_dialog() subprocess-based directory picker."""
+    """Test _open_directory_dialog() dispatches to the right backend."""
+
+    @patch("filament_calibrator.gui.platform.system", return_value="Darwin")
+    @patch("filament_calibrator.gui._osascript_directory_dialog",
+           return_value="/mac/dir")
+    def test_macos_uses_osascript(self, mock_osa: MagicMock,
+                                  _mock_sys: MagicMock) -> None:
+        assert _open_directory_dialog(title="Pick") == "/mac/dir"
+        mock_osa.assert_called_once_with("Pick")
+
+    @patch("filament_calibrator.gui.platform.system", return_value="Linux")
+    @patch("filament_calibrator.gui._tkinter_directory_dialog",
+           return_value="/linux/dir")
+    def test_linux_uses_tkinter(self, mock_tk: MagicMock,
+                                _mock_sys: MagicMock) -> None:
+        assert _open_directory_dialog(title="Dir") == "/linux/dir"
+        mock_tk.assert_called_once_with("Dir")
+
+
+# ---------------------------------------------------------------------------
+# _run_osascript
+# ---------------------------------------------------------------------------
+
+class TestRunOsascript:
+    """Test _run_osascript() helper."""
 
     @patch("filament_calibrator.gui.subprocess.run")
-    def test_returns_selected_path(self, mock_run: MagicMock) -> None:
-        mock_run.return_value = MagicMock(stdout="/path/to/output\n")
-        assert _open_directory_dialog(title="Pick dir") == "/path/to/output"
+    def test_returns_path(self, mock_run: MagicMock) -> None:
+        mock_run.return_value = MagicMock(stdout="/selected/path\n")
+        assert _run_osascript("choose file") == "/selected/path"
+        mock_run.assert_called_once_with(
+            ["osascript", "-e", "choose file"],
+            capture_output=True, text=True, timeout=120,
+        )
 
     @patch("filament_calibrator.gui.subprocess.run")
     def test_returns_none_on_cancel(self, mock_run: MagicMock) -> None:
         mock_run.return_value = MagicMock(stdout="")
-        assert _open_directory_dialog() is None
+        assert _run_osascript("choose file") is None
 
     @patch("filament_calibrator.gui.subprocess.run")
     def test_returns_none_on_timeout(self, mock_run: MagicMock) -> None:
         mock_run.side_effect = subprocess.TimeoutExpired(cmd="x", timeout=120)
-        assert _open_directory_dialog() is None
+        assert _run_osascript("choose file") is None
 
     @patch("filament_calibrator.gui.subprocess.run")
     def test_returns_none_on_os_error(self, mock_run: MagicMock) -> None:
         mock_run.side_effect = OSError()
-        assert _open_directory_dialog() is None
+        assert _run_osascript("choose file") is None
+
+    @patch("filament_calibrator.gui.subprocess.run")
+    def test_returns_none_on_file_not_found(self, mock_run: MagicMock) -> None:
+        mock_run.side_effect = FileNotFoundError()
+        assert _run_osascript("choose file") is None
+
+
+# ---------------------------------------------------------------------------
+# _osascript_file_dialog
+# ---------------------------------------------------------------------------
+
+class TestOsascriptFileDialog:
+    """Test _osascript_file_dialog() AppleScript generation."""
+
+    @patch("filament_calibrator.gui._run_osascript",
+           return_value="/path/f.ini")
+    def test_with_filetypes(self, mock_osa: MagicMock) -> None:
+        result = _osascript_file_dialog("Pick", [("INI", "*.ini")])
+        assert result == "/path/f.ini"
+        script = mock_osa.call_args[0][0]
+        assert '"ini"' in script
+        assert "choose file" in script
+
+    @patch("filament_calibrator.gui._run_osascript",
+           return_value="/path/f")
+    def test_without_filetypes(self, mock_osa: MagicMock) -> None:
+        _osascript_file_dialog("Open")
+        script = mock_osa.call_args[0][0]
+        assert "of type" not in script
+
+    @patch("filament_calibrator.gui._run_osascript",
+           return_value="/path/f")
+    def test_filetypes_none(self, mock_osa: MagicMock) -> None:
+        _osascript_file_dialog("Open", None)
+        script = mock_osa.call_args[0][0]
+        assert "of type" not in script
+
+    @patch("filament_calibrator.gui._run_osascript",
+           return_value="/path/f")
+    def test_star_wildcard_skipped(self, mock_osa: MagicMock) -> None:
+        _osascript_file_dialog("Open", [("All", "*.*")])
+        script = mock_osa.call_args[0][0]
+        # '*' is not a valid UTI, should not appear in of type clause
+        assert "of type" not in script
+
+
+# ---------------------------------------------------------------------------
+# _osascript_directory_dialog
+# ---------------------------------------------------------------------------
+
+class TestOsascriptDirectoryDialog:
+    """Test _osascript_directory_dialog() AppleScript generation."""
+
+    @patch("filament_calibrator.gui._run_osascript",
+           return_value="/path/dir")
+    def test_calls_choose_folder(self, mock_osa: MagicMock) -> None:
+        assert _osascript_directory_dialog("Pick") == "/path/dir"
+        script = mock_osa.call_args[0][0]
+        assert "choose folder" in script
+        assert "Pick" in script
+
+
+# ---------------------------------------------------------------------------
+# _tkinter_file_dialog
+# ---------------------------------------------------------------------------
+
+class TestTkinterFileDialog:
+    """Test _tkinter_file_dialog() subprocess-based file picker."""
+
+    @patch("filament_calibrator.gui.subprocess.run")
+    def test_returns_selected_path(self, mock_run: MagicMock) -> None:
+        mock_run.return_value = MagicMock(stdout="/path/to/config.ini\n")
+        result = _tkinter_file_dialog(title="Pick",
+                                      filetypes=[("INI", "*.ini")])
+        assert result == "/path/to/config.ini"
+        mock_run.assert_called_once()
+        assert mock_run.call_args[0][0][0] == sys.executable
+
+    @patch("filament_calibrator.gui.subprocess.run")
+    def test_returns_none_on_cancel(self, mock_run: MagicMock) -> None:
+        mock_run.return_value = MagicMock(stdout="\n")
+        assert _tkinter_file_dialog("Pick") is None
+
+    @patch("filament_calibrator.gui.subprocess.run")
+    def test_returns_none_on_empty(self, mock_run: MagicMock) -> None:
+        mock_run.return_value = MagicMock(stdout="")
+        assert _tkinter_file_dialog("Pick") is None
+
+    @patch("filament_calibrator.gui.subprocess.run")
+    def test_returns_none_on_timeout(self, mock_run: MagicMock) -> None:
+        mock_run.side_effect = subprocess.TimeoutExpired(cmd="x", timeout=120)
+        assert _tkinter_file_dialog("Pick") is None
+
+    @patch("filament_calibrator.gui.subprocess.run")
+    def test_returns_none_on_os_error(self, mock_run: MagicMock) -> None:
+        mock_run.side_effect = OSError("no python")
+        assert _tkinter_file_dialog("Pick") is None
+
+    @patch("filament_calibrator.gui.subprocess.run")
+    def test_returns_none_on_file_not_found(self, mock_run: MagicMock) -> None:
+        mock_run.side_effect = FileNotFoundError()
+        assert _tkinter_file_dialog("Pick") is None
+
+    @patch("filament_calibrator.gui.subprocess.run")
+    def test_no_filetypes(self, mock_run: MagicMock) -> None:
+        mock_run.return_value = MagicMock(stdout="/some/file\n")
+        assert _tkinter_file_dialog(title="Open") == "/some/file"
+
+    @patch("filament_calibrator.gui.subprocess.run")
+    def test_filetypes_in_script(self, mock_run: MagicMock) -> None:
+        mock_run.return_value = MagicMock(stdout="/x.ini\n")
+        _tkinter_file_dialog("Pick", filetypes=[("INI files", "*.ini")])
+        script = mock_run.call_args[0][0][2]
+        assert "*.ini" in script
+
+
+# ---------------------------------------------------------------------------
+# _tkinter_directory_dialog
+# ---------------------------------------------------------------------------
+
+class TestTkinterDirectoryDialog:
+    """Test _tkinter_directory_dialog() subprocess-based directory picker."""
+
+    @patch("filament_calibrator.gui.subprocess.run")
+    def test_returns_selected_path(self, mock_run: MagicMock) -> None:
+        mock_run.return_value = MagicMock(stdout="/path/to/output\n")
+        assert _tkinter_directory_dialog(title="Pick dir") == "/path/to/output"
+
+    @patch("filament_calibrator.gui.subprocess.run")
+    def test_returns_none_on_cancel(self, mock_run: MagicMock) -> None:
+        mock_run.return_value = MagicMock(stdout="")
+        assert _tkinter_directory_dialog("Pick") is None
+
+    @patch("filament_calibrator.gui.subprocess.run")
+    def test_returns_none_on_timeout(self, mock_run: MagicMock) -> None:
+        mock_run.side_effect = subprocess.TimeoutExpired(cmd="x", timeout=120)
+        assert _tkinter_directory_dialog("Pick") is None
+
+    @patch("filament_calibrator.gui.subprocess.run")
+    def test_returns_none_on_os_error(self, mock_run: MagicMock) -> None:
+        mock_run.side_effect = OSError()
+        assert _tkinter_directory_dialog("Pick") is None

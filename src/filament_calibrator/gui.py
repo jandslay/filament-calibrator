@@ -10,6 +10,7 @@ import argparse
 import contextlib
 import io
 import json
+import platform
 import subprocess
 import sys
 import tempfile
@@ -269,12 +270,84 @@ def _open_file_dialog(
 ) -> Optional[str]:
     """Open a native file chooser and return the selected path.
 
-    Runs ``tkinter.filedialog`` in a subprocess so that macOS AppKit
-    main-thread requirements are satisfied (Streamlit dispatches
-    callbacks on worker threads).
+    On macOS uses ``osascript`` (AppleScript) for a reliable native
+    dialog.  On other platforms falls back to ``tkinter.filedialog``
+    in a subprocess.
 
     Returns ``None`` if the user cancels or an error occurs.
     """
+    if platform.system() == "Darwin":
+        return _osascript_file_dialog(title, filetypes)
+    return _tkinter_file_dialog(title, filetypes)
+
+
+def _open_directory_dialog(
+    title: str = "Select Directory",
+) -> Optional[str]:
+    """Open a native directory chooser and return the selected path.
+
+    On macOS uses ``osascript`` (AppleScript).  On other platforms
+    falls back to ``tkinter.filedialog`` in a subprocess.
+
+    Returns ``None`` if the user cancels or an error occurs.
+    """
+    if platform.system() == "Darwin":
+        return _osascript_directory_dialog(title)
+    return _tkinter_directory_dialog(title)
+
+
+# --- macOS osascript dialogs ---
+
+
+def _osascript_file_dialog(
+    title: str,
+    filetypes: Optional[List[Tuple[str, str]]] = None,
+) -> Optional[str]:
+    """Open a macOS-native file chooser via ``osascript``."""
+    # Build "of type" clause from filetypes, e.g. *.ini → "ini"
+    type_clause = ""
+    if filetypes:
+        exts = []
+        for _label, pattern in filetypes:
+            ext = pattern.lstrip("*.")
+            if ext and ext != "*":
+                exts.append(f'"{ext}"')
+        if exts:
+            type_clause = f" of type {{{', '.join(exts)}}}"
+
+    applescript = (
+        f'POSIX path of (choose file with prompt "{title}"{type_clause})'
+    )
+    return _run_osascript(applescript)
+
+
+def _osascript_directory_dialog(title: str) -> Optional[str]:
+    """Open a macOS-native directory chooser via ``osascript``."""
+    applescript = f'POSIX path of (choose folder with prompt "{title}")'
+    return _run_osascript(applescript)
+
+
+def _run_osascript(script: str) -> Optional[str]:
+    """Run an AppleScript via ``osascript`` and return stdout or None."""
+    try:
+        result = subprocess.run(
+            ["osascript", "-e", script],
+            capture_output=True, text=True, timeout=120,
+        )
+        path = result.stdout.strip()
+        return path if path else None
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return None
+
+
+# --- tkinter fallback (non-macOS) ---
+
+
+def _tkinter_file_dialog(
+    title: str,
+    filetypes: Optional[List[Tuple[str, str]]] = None,
+) -> Optional[str]:
+    """Open a tkinter file chooser in a subprocess."""
     ft_json = json.dumps(filetypes or [])
     script = (
         "import json, tkinter as tk\n"
@@ -298,16 +371,8 @@ def _open_file_dialog(
         return None
 
 
-def _open_directory_dialog(
-    title: str = "Select Directory",
-) -> Optional[str]:
-    """Open a native directory chooser and return the selected path.
-
-    Runs ``tkinter.filedialog`` in a subprocess so that macOS AppKit
-    main-thread requirements are satisfied.
-
-    Returns ``None`` if the user cancels or an error occurs.
-    """
+def _tkinter_directory_dialog(title: str) -> Optional[str]:
+    """Open a tkinter directory chooser in a subprocess."""
     script = (
         "import tkinter as tk\n"
         "from tkinter import filedialog\n"
