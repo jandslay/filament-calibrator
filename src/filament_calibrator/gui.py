@@ -9,6 +9,9 @@ from __future__ import annotations
 import argparse
 import contextlib
 import io
+import json
+import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -256,6 +259,75 @@ def find_output_file(output_dir: str, ascii_gcode: bool) -> Optional[Path]:
 
 
 # ---------------------------------------------------------------------------
+# Native file/directory dialogs (subprocess-based for macOS safety)
+# ---------------------------------------------------------------------------
+
+
+def _open_file_dialog(
+    title: str = "Select File",
+    filetypes: Optional[List[Tuple[str, str]]] = None,
+) -> Optional[str]:
+    """Open a native file chooser and return the selected path.
+
+    Runs ``tkinter.filedialog`` in a subprocess so that macOS AppKit
+    main-thread requirements are satisfied (Streamlit dispatches
+    callbacks on worker threads).
+
+    Returns ``None`` if the user cancels or an error occurs.
+    """
+    ft_json = json.dumps(filetypes or [])
+    script = (
+        "import json, tkinter as tk\n"
+        "from tkinter import filedialog\n"
+        "root = tk.Tk(); root.withdraw()\n"
+        "root.attributes('-topmost', True)\n"
+        f"ft = [tuple(x) for x in json.loads({ft_json!r})]\n"
+        "if ft:\n"
+        "    ft.append(('All files', '*'))\n"
+        f"path = filedialog.askopenfilename(title={title!r}, filetypes=ft or ())\n"
+        "print(path or '')\n"
+    )
+    try:
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            capture_output=True, text=True, timeout=120,
+        )
+        path = result.stdout.strip()
+        return path if path else None
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return None
+
+
+def _open_directory_dialog(
+    title: str = "Select Directory",
+) -> Optional[str]:
+    """Open a native directory chooser and return the selected path.
+
+    Runs ``tkinter.filedialog`` in a subprocess so that macOS AppKit
+    main-thread requirements are satisfied.
+
+    Returns ``None`` if the user cancels or an error occurs.
+    """
+    script = (
+        "import tkinter as tk\n"
+        "from tkinter import filedialog\n"
+        "root = tk.Tk(); root.withdraw()\n"
+        "root.attributes('-topmost', True)\n"
+        f"path = filedialog.askdirectory(title={title!r})\n"
+        "print(path or '')\n"
+    )
+    try:
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            capture_output=True, text=True, timeout=120,
+        )
+        path = result.stdout.strip()
+        return path if path else None
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError):
+        return None
+
+
+# ---------------------------------------------------------------------------
 # Streamlit app (only imported when actually running the GUI)
 # ---------------------------------------------------------------------------
 
@@ -272,6 +344,12 @@ def _app() -> None:  # pragma: no cover
         layout="wide",
     )
     st.title("Filament Calibrator")
+
+    # Apply pending browse-dialog results before widgets render.
+    for _key in ("config_ini", "prusaslicer_path", "output_dir"):
+        _pending = f"_pending_{_key}"
+        if _pending in st.session_state:
+            st.session_state[_key] = st.session_state.pop(_pending)
 
     # --- Sidebar: shared settings ---
     with st.sidebar:
@@ -318,18 +396,64 @@ def _app() -> None:  # pragma: no cover
 
         st.divider()
         st.subheader("Advanced")
-        config_ini = st.text_input(
-            "PrusaSlicer config (.ini)",
-            placeholder="Leave empty for built-in defaults",
-        )
-        prusaslicer_path = st.text_input(
-            "PrusaSlicer path",
-            placeholder="Auto-detect",
-        )
-        custom_output_dir = st.text_input(
-            "Output directory",
-            placeholder="Auto (temp directory)",
-        )
+
+        col_ini, col_ini_btn = st.columns([5, 1])
+        with col_ini:
+            config_ini = st.text_input(
+                "PrusaSlicer config (.ini)",
+                placeholder="Leave empty for built-in defaults",
+                key="config_ini",
+            )
+        with col_ini_btn:
+            st.markdown("<div style='padding-top:28px'></div>",
+                        unsafe_allow_html=True)
+            if st.button("📂", key="browse_ini",
+                         help="Browse for .ini config"):
+                path = _open_file_dialog(
+                    title="Select PrusaSlicer config",
+                    filetypes=[("INI files", "*.ini")],
+                )
+                if path:
+                    st.session_state["_pending_config_ini"] = path
+                    st.rerun()
+
+        col_ps, col_ps_btn = st.columns([5, 1])
+        with col_ps:
+            prusaslicer_path = st.text_input(
+                "PrusaSlicer path",
+                placeholder="Auto-detect",
+                key="prusaslicer_path",
+            )
+        with col_ps_btn:
+            st.markdown("<div style='padding-top:28px'></div>",
+                        unsafe_allow_html=True)
+            if st.button("📂", key="browse_ps",
+                         help="Browse for PrusaSlicer"):
+                path = _open_file_dialog(
+                    title="Select PrusaSlicer executable",
+                )
+                if path:
+                    st.session_state["_pending_prusaslicer_path"] = path
+                    st.rerun()
+
+        col_od, col_od_btn = st.columns([5, 1])
+        with col_od:
+            custom_output_dir = st.text_input(
+                "Output directory",
+                placeholder="Auto (temp directory)",
+                key="output_dir",
+            )
+        with col_od_btn:
+            st.markdown("<div style='padding-top:28px'></div>",
+                        unsafe_allow_html=True)
+            if st.button("📂", key="browse_dir",
+                         help="Browse for directory"):
+                path = _open_directory_dialog(
+                    title="Select output directory",
+                )
+                if path:
+                    st.session_state["_pending_output_dir"] = path
+                    st.rerun()
 
     # --- Derived values ---
     derived_lh = round(nozzle_size * 0.5, 2)

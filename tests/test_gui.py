@@ -2,13 +2,17 @@
 from __future__ import annotations
 
 import argparse
+import subprocess
 import sys
+from unittest.mock import MagicMock, patch
 
 from filament_calibrator.gui import (
     _FALLBACK_PRESET,
     _NOZZLE_SIZES,
     _PRINTER_LIST,
     _fresh_output_dir,
+    _open_directory_dialog,
+    _open_file_dialog,
     build_flow_namespace,
     build_pa_namespace,
     build_temp_tower_namespace,
@@ -349,3 +353,84 @@ class TestFreshOutputDir:
     def test_temp_dirs_are_unique(self) -> None:
         dirs = {_fresh_output_dir("") for _ in range(5)}
         assert len(dirs) == 5
+
+
+# ---------------------------------------------------------------------------
+# _open_file_dialog
+# ---------------------------------------------------------------------------
+
+class TestOpenFileDialog:
+    """Test _open_file_dialog() subprocess-based file picker."""
+
+    @patch("filament_calibrator.gui.subprocess.run")
+    def test_returns_selected_path(self, mock_run: MagicMock) -> None:
+        mock_run.return_value = MagicMock(stdout="/path/to/config.ini\n")
+        result = _open_file_dialog(title="Pick", filetypes=[("INI", "*.ini")])
+        assert result == "/path/to/config.ini"
+        mock_run.assert_called_once()
+        assert mock_run.call_args[0][0][0] == sys.executable
+
+    @patch("filament_calibrator.gui.subprocess.run")
+    def test_returns_none_on_cancel(self, mock_run: MagicMock) -> None:
+        mock_run.return_value = MagicMock(stdout="\n")
+        assert _open_file_dialog() is None
+
+    @patch("filament_calibrator.gui.subprocess.run")
+    def test_returns_none_on_empty(self, mock_run: MagicMock) -> None:
+        mock_run.return_value = MagicMock(stdout="")
+        assert _open_file_dialog() is None
+
+    @patch("filament_calibrator.gui.subprocess.run")
+    def test_returns_none_on_timeout(self, mock_run: MagicMock) -> None:
+        mock_run.side_effect = subprocess.TimeoutExpired(cmd="x", timeout=120)
+        assert _open_file_dialog() is None
+
+    @patch("filament_calibrator.gui.subprocess.run")
+    def test_returns_none_on_os_error(self, mock_run: MagicMock) -> None:
+        mock_run.side_effect = OSError("no python")
+        assert _open_file_dialog() is None
+
+    @patch("filament_calibrator.gui.subprocess.run")
+    def test_returns_none_on_file_not_found(self, mock_run: MagicMock) -> None:
+        mock_run.side_effect = FileNotFoundError()
+        assert _open_file_dialog() is None
+
+    @patch("filament_calibrator.gui.subprocess.run")
+    def test_no_filetypes(self, mock_run: MagicMock) -> None:
+        mock_run.return_value = MagicMock(stdout="/some/file\n")
+        assert _open_file_dialog(title="Open") == "/some/file"
+
+    @patch("filament_calibrator.gui.subprocess.run")
+    def test_filetypes_in_script(self, mock_run: MagicMock) -> None:
+        mock_run.return_value = MagicMock(stdout="/x.ini\n")
+        _open_file_dialog(filetypes=[("INI files", "*.ini")])
+        script = mock_run.call_args[0][0][2]
+        assert "*.ini" in script
+
+
+# ---------------------------------------------------------------------------
+# _open_directory_dialog
+# ---------------------------------------------------------------------------
+
+class TestOpenDirectoryDialog:
+    """Test _open_directory_dialog() subprocess-based directory picker."""
+
+    @patch("filament_calibrator.gui.subprocess.run")
+    def test_returns_selected_path(self, mock_run: MagicMock) -> None:
+        mock_run.return_value = MagicMock(stdout="/path/to/output\n")
+        assert _open_directory_dialog(title="Pick dir") == "/path/to/output"
+
+    @patch("filament_calibrator.gui.subprocess.run")
+    def test_returns_none_on_cancel(self, mock_run: MagicMock) -> None:
+        mock_run.return_value = MagicMock(stdout="")
+        assert _open_directory_dialog() is None
+
+    @patch("filament_calibrator.gui.subprocess.run")
+    def test_returns_none_on_timeout(self, mock_run: MagicMock) -> None:
+        mock_run.side_effect = subprocess.TimeoutExpired(cmd="x", timeout=120)
+        assert _open_directory_dialog() is None
+
+    @patch("filament_calibrator.gui.subprocess.run")
+    def test_returns_none_on_os_error(self, mock_run: MagicMock) -> None:
+        mock_run.side_effect = OSError()
+        assert _open_directory_dialog() is None
