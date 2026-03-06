@@ -7,7 +7,6 @@ thumbnails.
 """
 from __future__ import annotations
 
-import io
 import multiprocessing as mp
 import platform
 import struct

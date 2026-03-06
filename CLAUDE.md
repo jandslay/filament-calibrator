@@ -131,7 +131,7 @@ override the preset.  Unknown filament names fall back to safe defaults
 
 All slicer functions accept `nozzle_diameter` to pass `--nozzle-diameter` to
 PrusaSlicer, and pass `--center` and `--bed-shape` for Prusa MK-series bed
-geometry (250×210mm).  All default to `binary_gcode=True` which passes
+geometry (250×220mm).  All default to `binary_gcode=True` which passes
 `--binary-gcode` to PrusaSlicer, producing `.bgcode` output with embedded
 thumbnail previews.  Use `--ascii-gcode` on the CLI to switch to text
 `.gcode` output.
@@ -150,8 +150,9 @@ thumbnail previews.  Use `--ascii-gcode` on the CLI to switch to text
   in argparse
 - Filament preset lookup is case-insensitive (`.upper()`)
 - Shared CLI helpers (`_apply_config`, `_resolve_output_dir`, `_gcode_ext`,
-  `_UNSET`, `_KNOWN_TYPES`, `_ARGPARSE_DEFAULTS`) live in `cli.py` and are
-  imported by `em_cli.py`, `flow_cli.py`, and `pa_cli.py`
+  `_unique_suffix`, `_resolve_filament_preset`, `_UNSET`, `_KNOWN_TYPES`,
+  `_ARGPARSE_DEFAULTS`) live in `cli.py` and are imported by `em_cli.py`,
+  `flow_cli.py`, and `pa_cli.py`
 
 ## Testing
 

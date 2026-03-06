@@ -189,4 +189,5 @@ class TestGeneratePATowerStl:
         generate_pa_tower_stl(config, output)
 
         export_call = mock_cq.exporters.export.call_args
-        assert export_call[1]["exportType"] == "STL" or export_call[0][1] == output
+        assert export_call[1]["exportType"] == "STL"
+        assert export_call[0][1] == output

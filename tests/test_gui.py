@@ -821,7 +821,6 @@ class TestApplyIniToSession:
         # Selectbox widget keys (written directly for Streamlit key= binding).
         assert state["sidebar_nozzle_size"] == 0.4
         assert state["sidebar_printer"] == "COREONE"
-        assert state["_ini_bed_center"] == "125,110"
 
     def test_partial_dict_only_temp(self) -> None:
         state: dict = {}
@@ -852,10 +851,11 @@ class TestApplyIniToSession:
         apply_ini_to_session(state, {"printer_model": "coreone"})
         assert state["sidebar_printer"] == "COREONE"
 
-    def test_bed_center_stored(self) -> None:
+    def test_bed_center_ignored(self) -> None:
+        """bed_center from INI is not stored — pipelines compute it from printer."""
         state: dict = {}
         apply_ini_to_session(state, {"bed_center": "100,100"})
-        assert state["_ini_bed_center"] == "100,100"
+        assert "_ini_bed_center" not in state
 
     def test_known_filament_type_stored(self) -> None:
         state: dict = {}

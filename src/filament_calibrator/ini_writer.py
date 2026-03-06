@@ -7,8 +7,8 @@ output is a minimal diff from the input.
 """
 from __future__ import annotations
 
-import dataclasses
 import re
+from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
 
@@ -16,7 +16,7 @@ from typing import List, Optional, Tuple
 # Data
 # ---------------------------------------------------------------------------
 
-@dataclasses.dataclass
+@dataclass
 class CalibrationResults:
     """Container for calibration values to merge into a slicer config.
 

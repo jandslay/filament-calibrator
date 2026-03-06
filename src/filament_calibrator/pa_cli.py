@@ -22,6 +22,7 @@ from filament_calibrator.cli import (
     _UNSET,
     _apply_config,
     _gcode_ext,
+    _resolve_filament_preset as _resolve_preset,
     _resolve_output_dir,
     _unique_suffix,
 )
@@ -345,30 +346,6 @@ def _validate_pa_args(
     return num_levels
 
 
-def _resolve_preset(args: argparse.Namespace) -> Dict[str, object]:
-    """Look up the filament preset and return resolved slicer settings.
-
-    Returns a dict with keys ``nozzle_temp``, ``bed_temp``, ``fan_speed``.
-    """
-    filament_key = args.filament_type.upper()
-    preset = gl.FILAMENT_PRESETS.get(filament_key)
-
-    if preset is not None:
-        default_nozzle = int(preset["hotend"])
-        default_bed = int(preset["bed"])
-        default_fan = int(preset["fan"])
-    else:
-        default_nozzle = 210
-        default_bed = 60
-        default_fan = 100
-
-    return {
-        "nozzle_temp": args.nozzle_temp if args.nozzle_temp is not _UNSET else default_nozzle,
-        "bed_temp": args.bed_temp if args.bed_temp is not _UNSET else default_bed,
-        "fan_speed": args.fan_speed if args.fan_speed is not _UNSET else default_fan,
-    }
-
-
 # ---------------------------------------------------------------------------
 # Shared pipeline helpers
 # ---------------------------------------------------------------------------
@@ -458,7 +435,10 @@ def _render_gcode_templates(
 # ---------------------------------------------------------------------------
 
 
-def _run_tower_pipeline(args: argparse.Namespace) -> None:
+def _run_tower_pipeline(
+    args: argparse.Namespace,
+    toml_config: Dict[str, object],
+) -> None:
     """Execute the tower-method PA calibration pipeline."""
     common = _resolve_common(args)
     num_levels = common["num_levels"]
@@ -472,14 +452,14 @@ def _run_tower_pipeline(args: argparse.Namespace) -> None:
     bed_shape = common["bed_shape"]
 
     if args.verbose:
-        _debug_common(args, common)
+        _debug_common(args, common, toml_config)
 
     config = PATowerConfig(
         num_levels=num_levels,
         level_height=args.level_height,
         filament_type=args.filament_type,
     )
-    out_dir = _resolve_output_dir(args.output_dir)
+    out_dir = _resolve_output_dir(args.output_dir, prefix="pressure-advance-")
 
     if args.verbose:
         print(f"[DEBUG] PA tower: {num_levels} levels, "
@@ -596,7 +576,10 @@ def _run_tower_pipeline(args: argparse.Namespace) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _run_pattern_pipeline(args: argparse.Namespace) -> None:
+def _run_pattern_pipeline(
+    args: argparse.Namespace,
+    toml_config: Dict[str, object],
+) -> None:
     """Execute the pattern-method PA calibration pipeline."""
     common = _resolve_common(args)
     num_levels = common["num_levels"]
@@ -610,7 +593,7 @@ def _run_pattern_pipeline(args: argparse.Namespace) -> None:
     bed_shape = common["bed_shape"]
 
     if args.verbose:
-        _debug_common(args, common)
+        _debug_common(args, common, toml_config)
 
     config = PAPatternConfig(
         num_patterns=num_levels,
@@ -624,7 +607,7 @@ def _run_pattern_pipeline(args: argparse.Namespace) -> None:
         layer_height=layer_height,
         filament_type=args.filament_type,
     )
-    out_dir = _resolve_output_dir(args.output_dir)
+    out_dir = _resolve_output_dir(args.output_dir, prefix="pressure-advance-")
 
     if args.verbose:
         print(f"[DEBUG] PA pattern: {num_levels} chevrons, "
@@ -661,6 +644,9 @@ def _run_pattern_pipeline(args: argparse.Namespace) -> None:
     gcode_ext = _gcode_ext(args.ascii_gcode)
     raw_gcode_path = str(out_dir / stl_name.replace(".stl", f"_raw{gcode_ext}"))
     print(f"Slicing → {raw_gcode_path}")
+    if args.verbose:
+        effective_center = args.bed_center or f"{DEFAULT_BED_CENTER} (default)"
+        print(f"[DEBUG] Bed center: {effective_center}")
 
     model_height = pattern_total_height(config)
     model_depth = chevron_y_extent(config.arm_length, config.corner_angle)
@@ -760,11 +746,14 @@ def _run_pattern_pipeline(args: argparse.Namespace) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _debug_common(args: argparse.Namespace, common: dict) -> None:
+def _debug_common(
+    args: argparse.Namespace,
+    common: dict,
+    toml_config: Dict[str, object],
+) -> None:
     """Print common debug information."""
     cfg_path = _find_config_path(args.config)
     if cfg_path is not None:
-        toml_config = load_config(args.config)
         print(f"[DEBUG] Config file: {cfg_path}")
         print(f"[DEBUG] Config values: {toml_config}")
     else:
@@ -829,9 +818,9 @@ def run(args: argparse.Namespace) -> None:
 
     method = getattr(args, "method", "tower")
     if method == "pattern":
-        _run_pattern_pipeline(args)
+        _run_pattern_pipeline(args, toml_config)
     else:
-        _run_tower_pipeline(args)
+        _run_tower_pipeline(args, toml_config)
 
 
 def main(argv: Optional[List[str]] = None) -> None:

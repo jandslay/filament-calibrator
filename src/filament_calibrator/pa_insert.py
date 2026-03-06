@@ -15,6 +15,8 @@ from typing import List
 
 import gcode_lib as gl
 
+from filament_calibrator.flow_insert import _is_extrusion_move
+
 
 # ---------------------------------------------------------------------------
 # Data structures
@@ -158,9 +160,9 @@ def insert_pa_commands(
     return result
 
 
-# ===================================================================
+# ---------------------------------------------------------------------------
 # X-based insertion (pattern method)
-# ===================================================================
+# ---------------------------------------------------------------------------
 
 
 @dataclass
@@ -228,19 +230,6 @@ def _region_for_x(
         if region.x_start <= x < region.x_end:
             return region
     return None
-
-
-def _is_extrusion_move(line: gl.GCodeLine) -> bool:
-    """Return ``True`` if *line* is a G1 move that extrudes material.
-
-    An extrusion move has an ``E`` word and at least one of ``X`` or ``Y``
-    (i.e. lateral movement, not just a retraction or Z-only move).
-    """
-    if line.command != "G1":
-        return False
-    if "E" not in line.words:
-        return False
-    return "X" in line.words or "Y" in line.words
 
 
 def insert_pa_pattern_commands(

@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import argparse
 import sys
-import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -18,6 +17,7 @@ from filament_calibrator.cli import (
     _UNSET,
     _apply_config,
     _gcode_ext,
+    _resolve_filament_preset as _resolve_preset,
     _resolve_output_dir,
     _unique_suffix,
 )
@@ -258,30 +258,6 @@ def _validate_flow_args(
     return num_levels
 
 
-def _resolve_preset(args: argparse.Namespace) -> Dict[str, object]:
-    """Look up the filament preset and return resolved slicer settings.
-
-    Returns a dict with keys ``nozzle_temp``, ``bed_temp``, ``fan_speed``.
-    """
-    filament_key = args.filament_type.upper()
-    preset = gl.FILAMENT_PRESETS.get(filament_key)
-
-    if preset is not None:
-        default_nozzle = int(preset["hotend"])
-        default_bed = int(preset["bed"])
-        default_fan = int(preset["fan"])
-    else:
-        default_nozzle = 210
-        default_bed = 60
-        default_fan = 100
-
-    return {
-        "nozzle_temp": args.nozzle_temp if args.nozzle_temp is not _UNSET else default_nozzle,
-        "bed_temp": args.bed_temp if args.bed_temp is not _UNSET else default_bed,
-        "fan_speed": args.fan_speed if args.fan_speed is not _UNSET else default_fan,
-    }
-
-
 def run(args: argparse.Namespace) -> None:
     """Execute the full volumetric-flow calibration pipeline.
 
@@ -361,7 +337,7 @@ def run(args: argparse.Namespace) -> None:
         level_height=args.level_height,
         filament_type=args.filament_type,
     )
-    out_dir = _resolve_output_dir(args.output_dir)
+    out_dir = _resolve_output_dir(args.output_dir, prefix="volumetric-flow-")
 
     if args.verbose:
         print(f"[DEBUG] Flow: {num_levels} levels, "

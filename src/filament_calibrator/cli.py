@@ -19,8 +19,6 @@ from filament_calibrator.printer_gcode import (
     KNOWN_PRINTERS,
     compute_bed_center,
     compute_bed_shape,
-    render_end_gcode,
-    render_start_gcode,
     resolve_printer,
 )
 from filament_calibrator.slicer import (
@@ -135,7 +133,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--printer", type=str, default="COREONE",
         help=(
-            f"Printer model for start/end G-code and bed dimensions. "
+            f"Printer model for bed dimensions and metadata. "
             f"Available: {printer_names} (also accepts mk4 as alias for mk4s). "
             "Auto-sets --bed-center and bed shape from the printer's preset."
         ),
@@ -226,13 +224,16 @@ def _apply_config(args: argparse.Namespace, config: Dict[str, object]) -> None:
             setattr(args, attr, value)
 
 
-def _resolve_output_dir(output_dir: Optional[str]) -> Path:
+def _resolve_output_dir(
+    output_dir: Optional[str],
+    prefix: str = "filament-calibrator-",
+) -> Path:
     """Resolve the output directory, creating it if needed."""
     if output_dir:
         p = Path(output_dir)
         p.mkdir(parents=True, exist_ok=True)
         return p
-    return Path(tempfile.mkdtemp(prefix="temperature-tower-"))
+    return Path(tempfile.mkdtemp(prefix=prefix))
 
 
 def _gcode_ext(ascii_gcode: bool) -> str:
@@ -253,7 +254,33 @@ def _unique_suffix() -> str:
     return secrets.token_hex(3)[:5]
 
 
-def resolve_preset(args: argparse.Namespace) -> Dict[str, object]:
+def _resolve_filament_preset(args: argparse.Namespace) -> Dict[str, object]:
+    """Look up the filament preset and return resolved slicer settings.
+
+    Returns a dict with keys ``nozzle_temp``, ``bed_temp``, ``fan_speed``.
+    Used by all non-temperature-tower CLIs where only a single nozzle
+    temperature is needed (as opposed to a start/end range).
+    """
+    filament_key = args.filament_type.upper()
+    preset = gl.FILAMENT_PRESETS.get(filament_key)
+
+    if preset is not None:
+        default_nozzle = int(preset["hotend"])
+        default_bed = int(preset["bed"])
+        default_fan = int(preset["fan"])
+    else:
+        default_nozzle = 210
+        default_bed = 60
+        default_fan = 100
+
+    return {
+        "nozzle_temp": args.nozzle_temp if args.nozzle_temp is not _UNSET else default_nozzle,
+        "bed_temp": args.bed_temp if args.bed_temp is not _UNSET else default_bed,
+        "fan_speed": args.fan_speed if args.fan_speed is not _UNSET else default_fan,
+    }
+
+
+def _resolve_preset(args: argparse.Namespace) -> Dict[str, object]:
     """Look up the filament preset and return resolved settings.
 
     Returns a dict with keys ``start_temp``, ``end_temp``, ``bed_temp``,
@@ -261,7 +288,8 @@ def resolve_preset(args: argparse.Namespace) -> Dict[str, object]:
     supply explicit CLI overrides.
 
     Preset ``temp_max`` / ``temp_min`` are used directly as the default
-    start and end temperatures.
+    start and end temperatures.  This function is specific to the
+    temperature-tower CLI.
     """
     filament_key = args.filament_type.upper()
     preset = gl.FILAMENT_PRESETS.get(filament_key)
@@ -370,7 +398,7 @@ def run(args: argparse.Namespace) -> None:
               file=sys.stderr)
         sys.exit(1)
 
-    resolved = resolve_preset(args)
+    resolved = _resolve_preset(args)
     start_temp: int = resolved["start_temp"]
     end_temp: int = resolved["end_temp"]
     bed_temp: int = resolved["bed_temp"]
@@ -388,7 +416,7 @@ def run(args: argparse.Namespace) -> None:
               f"bed_temp={bed_temp} fan_speed={fan_speed}")
 
     config = _build_tower_config(args, start_temp, end_temp)
-    out_dir = _resolve_output_dir(args.output_dir)
+    out_dir = _resolve_output_dir(args.output_dir, prefix="temperature-tower-")
 
     if args.verbose:
         print(f"[DEBUG] Tower: {config.num_tiers} tiers, "

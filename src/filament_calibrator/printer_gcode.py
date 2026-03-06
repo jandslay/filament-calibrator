@@ -525,11 +525,7 @@ def render_end_gcode(
     """
     template = _TEMPLATES[printer].end
     # Park Z: at least max_layer_z + 10, capped at printer's max Z.
-    preset = gl.PRINTER_PRESETS.get(
-        _PRINTER_ALIASES.get(printer, printer)
-    )
-    if preset is None:
-        preset = gl.PRINTER_PRESETS.get(printer)
+    preset = _lookup_preset(printer)
     max_z = float(preset["max_z"]) if preset is not None else 250.0
     park_z = min(max_layer_z + 10.0, max_z)
 

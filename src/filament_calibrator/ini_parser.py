@@ -65,7 +65,7 @@ def _parse_extrusion_width(raw: str) -> Optional[float]:
 def _parse_bed_shape(raw: str) -> Optional[str]:
     """Parse PrusaSlicer ``bed_shape`` and compute the bed centre.
 
-    The expected format is ``"0x0,250x0,250x210,0x210"`` — four corners
+    The expected format is ``"0x0,250x0,250x220,0x220"`` — four corners
     of a rectangle with ``x`` as coordinate separator within each
     corner.  Returns the centre as ``"X,Y"`` (integer coordinates), or
     ``None`` when the value is malformed.

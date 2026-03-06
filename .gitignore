@@ -29,3 +29,11 @@ Thumbs.db
 # Output files
 *.stl
 *.gcode
+*.bgcode
+output/
+
+# User config (may contain API keys)
+filament-calibrator.toml
+
+# Claude Code
+.claude/

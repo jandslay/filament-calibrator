@@ -17,9 +17,9 @@ printer = "coreone"
 # config-ini = "/path/to/printer-profile.ini"
 
 # Bed centre in mm (X,Y) — used to position the model on the print bed.
-# Default is 125,105 (Prusa MK-series 250×210 mm bed).
+# Default is 125,110 (Prusa MK-series 250×220 mm bed).
 # Auto-set by printer if specified. For Prusa MINI, use 90,90.
-# bed-center = "125,105"
+# bed-center = "125,110"
 
 # Nozzle size in mm — derives layer height (nozzle × 0.5) and
 # extrusion width (nozzle × 1.125). Default: 0.4

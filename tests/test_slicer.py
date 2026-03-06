@@ -537,16 +537,18 @@ class TestVaseModeSlicerArgs:
         assert "first-layer-height" in VASE_MODE_SLICER_ARGS
         assert "perimeters" in VASE_MODE_SLICER_ARGS
         assert "top-solid-layers" in VASE_MODE_SLICER_ARGS
-        assert "bottom-solid-layers" in VASE_MODE_SLICER_ARGS
         assert "fill-density" in VASE_MODE_SLICER_ARGS
-        assert "brim-width" in VASE_MODE_SLICER_ARGS
 
     def test_vase_mode_values(self):
         assert VASE_MODE_SLICER_ARGS["perimeters"] == "1"
         assert VASE_MODE_SLICER_ARGS["top-solid-layers"] == "0"
         assert VASE_MODE_SLICER_ARGS["fill-density"] == "0%"
         assert VASE_MODE_SLICER_ARGS["skirts"] == "0"
-        assert VASE_MODE_SLICER_ARGS["brim-width"] == "5"
+
+    def test_bottom_brim_not_in_dict(self):
+        """bottom-solid-layers and brim-width are hardcoded in slice functions."""
+        assert "bottom-solid-layers" not in VASE_MODE_SLICER_ARGS
+        assert "brim-width" not in VASE_MODE_SLICER_ARGS
 
     def test_no_layer_height(self):
         """layer-height is NOT in VASE_MODE_SLICER_ARGS (set explicitly)."""
@@ -1529,17 +1531,18 @@ class TestEmSlicerArgs:
         assert "first-layer-height" in EM_SLICER_ARGS
         assert "perimeters" in EM_SLICER_ARGS
         assert "top-solid-layers" in EM_SLICER_ARGS
-        assert "bottom-solid-layers" in EM_SLICER_ARGS
         assert "fill-density" in EM_SLICER_ARGS
-        assert "brim-width" in EM_SLICER_ARGS
 
     def test_em_values(self):
         assert EM_SLICER_ARGS["perimeters"] == "1"
         assert EM_SLICER_ARGS["top-solid-layers"] == "0"
-        assert EM_SLICER_ARGS["bottom-solid-layers"] == "0"
         assert EM_SLICER_ARGS["fill-density"] == "0%"
         assert EM_SLICER_ARGS["skirts"] == "0"
-        assert EM_SLICER_ARGS["brim-width"] == "5"
+
+    def test_bottom_brim_not_in_dict(self):
+        """bottom-solid-layers and brim-width are hardcoded in slice_em_specimen."""
+        assert "bottom-solid-layers" not in EM_SLICER_ARGS
+        assert "brim-width" not in EM_SLICER_ARGS
 
     def test_no_layer_height(self):
         """layer-height is NOT in EM_SLICER_ARGS (set explicitly)."""

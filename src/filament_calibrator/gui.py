@@ -571,9 +571,6 @@ def apply_ini_to_session(
         if pm in _PRINTER_LIST:
             state["sidebar_printer"] = pm
 
-    if "bed_center" in ini_vals:
-        state["_ini_bed_center"] = ini_vals["bed_center"]
-
     if "filament_type" in ini_vals:
         ft = ini_vals["filament_type"].upper()
         state["sidebar_filament_type"] = ft
@@ -648,6 +645,7 @@ def _app() -> None:  # pragma: no cover
     import streamlit as st
 
     from filament_calibrator.cli import run as temp_run
+    from filament_calibrator.em_cli import run as em_run
     from filament_calibrator.flow_cli import run as flow_run
     from filament_calibrator.pa_cli import run as pa_run
 
@@ -997,7 +995,7 @@ def _app() -> None:  # pragma: no cover
                 key="em_fan",
             )
 
-        with st.expander("Advanced Settings"):
+        with st.expander("Advanced Slicer Settings"):
             em_cube_size = st.number_input(
                 "Cube Size (mm)",
                 value=40.0,
@@ -1025,8 +1023,6 @@ def _app() -> None:  # pragma: no cover
 
         if st.button("Generate EM Cube", type="primary",
                       key="run_em"):
-            from filament_calibrator.em_cli import run as em_run
-
             run_dir = _fresh_output_dir(custom_output_dir)
             args = build_em_namespace(
                 filament_type=filament_type,
@@ -1254,7 +1250,7 @@ def _app() -> None:  # pragma: no cover
                 format="%.4f",
             )
 
-        col4, col5, col6 = st.columns(3)
+        col4, col5, col6, col7 = st.columns(4)
         with col4:
             pa_nozzle_temp = st.number_input(
                 "Nozzle Temp (\u00b0C)",
@@ -1275,6 +1271,16 @@ def _app() -> None:  # pragma: no cover
                 min_value=0,
                 max_value=100,
                 key="pa_fan",
+            )
+        with col7:
+            pa_firmware = st.selectbox(
+                "Firmware",
+                options=["marlin", "klipper"],
+                help=(
+                    "Marlin uses M900 K<value>. "
+                    "Klipper uses SET_PRESSURE_ADVANCE ADVANCE=<value>."
+                ),
+                key="pa_firmware",
             )
 
         # Pattern-specific settings (defaults used when method is tower)
@@ -1372,7 +1378,7 @@ def _app() -> None:  # pragma: no cover
                 start_pa=start_pa,
                 end_pa=end_pa,
                 pa_step=pa_step_val,
-                firmware="marlin",
+                firmware=pa_firmware,
                 method=method_key,
                 level_height=pa_level_height,
                 nozzle_temp=pa_nozzle_temp,

@@ -14,9 +14,10 @@ CLI tool suite for 3D printer filament calibration on Prusa printers.
 - **`volumetric-flow`** — generates a serpentine wall specimen, slices it in
   spiral vase mode, and injects progressively increasing print speeds to
   determine the maximum volumetric flow rate for a filament/hotend combination.
-- **`pressure-advance`** — generates a hollow rectangular tower with sharp
-  corners, slices it with PrusaSlicer, and injects pressure advance commands
-  at each height level to find the optimal PA value for your setup.
+- **`pressure-advance`** — two methods for finding the optimal PA/Linear
+  Advance value: **tower** (default) generates a hollow tower with sharp
+  corners where PA varies by height; **pattern** generates nested chevron
+  outlines where PA varies by X position.
 
 ## Prerequisites
 
@@ -121,9 +122,9 @@ api-key = "your-prusalink-api-key"
 # prusaslicer-path = "/usr/bin/prusa-slicer"
 # config-ini = "/path/to/printer-profile.ini"
 
-# Bed centre in mm — default is 125,105 (Prusa MK-series).
+# Bed centre in mm — default is 125,110 (Prusa MK-series 250×220 mm bed).
 # Auto-set by printer if specified. For Prusa MINI, use 90,90.
-# bed-center = "125,105"
+# bed-center = "125,110"
 
 # Nozzle size in mm — derives layer height (nozzle × 0.5) and
 # extrusion width (nozzle × 1.125). Default: 0.4
@@ -571,6 +572,10 @@ pressure-advance \
 
 ### How It Works
 
+Two calibration methods are available via `--method`:
+
+#### Tower method (default)
+
 1. **Model generation** — CadQuery builds a hollow rectangular tower (60×60 mm,
    1.6 mm wall thickness) with perfectly sharp 90° corners. The tower height
    equals `num_levels × level_height`. Sharp corners are critical — they reveal
@@ -585,14 +590,26 @@ pressure-advance \
    G-code layer boundaries corresponding to each level. Marlin firmware uses
    `M900 K<value>`, Klipper uses `SET_PRESSURE_ADVANCE ADVANCE=<value>`.
 
-4. **Upload** — Same PrusaLink upload path as the other tools.
+#### Pattern method
+
+1. **Model generation** — CadQuery builds nested chevron (V-shape) outlines
+   inside a rectangular frame, with embossed PA value labels. Each chevron is
+   printed at a different PA value.
+
+2. **Slicing** — PrusaSlicer slices with the wall count matching the pattern
+   config (default 3 walls).
+
+3. **PA command insertion** — PA commands are inserted based on X position
+   (by chevron tip location) rather than Z height.
 
 ### Interpreting the Print
 
-Print the specimen and examine the corners at each level. The level with the
-sharpest corners (no bulging, no rounding) is your optimal pressure advance
-value. The tool prints a lookup table mapping Z heights to PA values for easy
-reference.
+**Tower:** Examine the corners at each level. The level with the sharpest
+corners (no bulging, no rounding) is your optimal PA value. The tool prints a
+lookup table mapping Z heights to PA values.
+
+**Pattern:** Inspect which chevron has the sharpest corners. The PA value
+is embossed next to each chevron for easy identification.
 
 ### CLI Reference
 
@@ -600,9 +617,10 @@ reference.
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--start-pa` | *required* | Starting PA value (bottom level) |
-| `--end-pa` | *required* | Ending PA value (top level) |
+| `--start-pa` | *required* | Starting PA value (bottom level / first chevron) |
+| `--end-pa` | *required* | Ending PA value (top level / last chevron) |
 | `--pa-step` | *required* | PA value increment per level |
+| `--method` | `tower` | Calibration method: `tower` or `pattern` |
 | `--firmware` | `marlin` | Firmware type: `marlin` (M900) or `klipper` (SET_PRESSURE_ADVANCE) |
 
 The PA range must be evenly divisible by `--pa-step`, and the resulting number
@@ -613,7 +631,20 @@ of levels cannot exceed 50. `--start-pa` must be non-negative.
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--filament-type` | `PLA` | Filament type — sets nozzle temp, bed temp, and fan speed from preset |
-| `--level-height` | `1.0` | Height per PA level in mm |
+| `--level-height` | `1.0` | Height per PA level in mm (tower method only) |
+
+#### Pattern Method Options
+
+These flags apply only when `--method pattern` is used:
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--corner-angle` | `90` | Full angle at the chevron tip in degrees |
+| `--arm-length` | `25.0` | Length of each chevron arm in mm |
+| `--wall-count` | `3` | Number of concentric perimeter walls |
+| `--num-layers` | `3` | Number of layers (height = num_layers × layer_height) |
+| `--pattern-spacing` | `2.0` | Spacing between chevron centres in mm |
+| `--frame-offset` | `3.0` | Distance from outermost chevron to frame edge in mm |
 
 #### Nozzle Options
 
@@ -725,6 +756,15 @@ pressure-advance \
   --start-pa 0 --end-pa 0.10 --pa-step 0.01 \
   --nozzle-size 0.6 \
   --no-upload
+```
+
+Pattern method (chevron shapes instead of tower):
+
+```bash
+pressure-advance \
+  --method pattern \
+  --start-pa 0 --end-pa 0.10 --pa-step 0.005 \
+  --no-upload --output-dir ./output
 ```
 
 MK4S with ABS filament:

@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import argparse
-import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch, call
 
@@ -22,7 +21,7 @@ from filament_calibrator.cli import (
     _unique_suffix,
     build_parser,
     main,
-    resolve_preset,
+    _resolve_preset,
     run,
     _resolve_output_dir,
     _build_tower_config,
@@ -246,7 +245,7 @@ class TestResolveOutputDir:
     def test_none_creates_temp(self):
         result = _resolve_output_dir(None)
         assert result.exists()
-        assert "temperature-tower" in str(result)
+        assert "filament-calibrator" in str(result)
 
 
 # ---------------------------------------------------------------------------
@@ -280,7 +279,7 @@ class TestUniqueSuffix:
 
 
 # ---------------------------------------------------------------------------
-# resolve_preset
+# _resolve_preset
 # ---------------------------------------------------------------------------
 
 
@@ -291,7 +290,7 @@ class TestResolvePreset:
             filament_type="PLA", start_temp=_UNSET, end_temp=_UNSET,
             bed_temp=_UNSET, fan_speed=_UNSET,
         )
-        r = resolve_preset(args)
+        r = _resolve_preset(args)
         assert r["start_temp"] == 230
         assert r["end_temp"] == 190
         assert r["bed_temp"] == 60
@@ -303,7 +302,7 @@ class TestResolvePreset:
             filament_type="PETG", start_temp=_UNSET, end_temp=_UNSET,
             bed_temp=_UNSET, fan_speed=_UNSET,
         )
-        r = resolve_preset(args)
+        r = _resolve_preset(args)
         assert r["start_temp"] == 260
         assert r["end_temp"] == 220
         assert r["bed_temp"] == 80
@@ -315,7 +314,7 @@ class TestResolvePreset:
             filament_type="ABS", start_temp=_UNSET, end_temp=_UNSET,
             bed_temp=_UNSET, fan_speed=_UNSET,
         )
-        r = resolve_preset(args)
+        r = _resolve_preset(args)
         assert r["start_temp"] == 270
         assert r["end_temp"] == 230
         assert r["bed_temp"] == 100
@@ -327,7 +326,7 @@ class TestResolvePreset:
             filament_type="pla", start_temp=_UNSET, end_temp=_UNSET,
             bed_temp=_UNSET, fan_speed=_UNSET,
         )
-        r = resolve_preset(args)
+        r = _resolve_preset(args)
         assert r["start_temp"] == 230
         assert r["end_temp"] == 190
         assert r["bed_temp"] == 60
@@ -338,7 +337,7 @@ class TestResolvePreset:
             filament_type="EXOTIC", start_temp=_UNSET, end_temp=_UNSET,
             bed_temp=_UNSET, fan_speed=_UNSET,
         )
-        r = resolve_preset(args)
+        r = _resolve_preset(args)
         assert r["start_temp"] == 230
         assert r["end_temp"] == 190
         assert r["bed_temp"] == 60
@@ -349,7 +348,7 @@ class TestResolvePreset:
             filament_type="PLA", start_temp=240, end_temp=_UNSET,
             bed_temp=_UNSET, fan_speed=_UNSET,
         )
-        r = resolve_preset(args)
+        r = _resolve_preset(args)
         assert r["start_temp"] == 240
         assert r["end_temp"] == 190  # still from preset
         assert r["bed_temp"] == 60
@@ -360,7 +359,7 @@ class TestResolvePreset:
             filament_type="PLA", start_temp=_UNSET, end_temp=200,
             bed_temp=_UNSET, fan_speed=_UNSET,
         )
-        r = resolve_preset(args)
+        r = _resolve_preset(args)
         assert r["start_temp"] == 230  # still from preset
         assert r["end_temp"] == 200
 
@@ -369,7 +368,7 @@ class TestResolvePreset:
             filament_type="PETG", start_temp=_UNSET, end_temp=_UNSET,
             bed_temp=90, fan_speed=_UNSET,
         )
-        r = resolve_preset(args)
+        r = _resolve_preset(args)
         assert r["bed_temp"] == 90
         assert r["fan_speed"] == 40  # still from preset
 
@@ -378,7 +377,7 @@ class TestResolvePreset:
             filament_type="PLA", start_temp=_UNSET, end_temp=_UNSET,
             bed_temp=_UNSET, fan_speed=50,
         )
-        r = resolve_preset(args)
+        r = _resolve_preset(args)
         assert r["fan_speed"] == 50
         assert r["bed_temp"] == 60  # still from preset
 
@@ -388,7 +387,7 @@ class TestResolvePreset:
             filament_type="PLA", start_temp=250, end_temp=200,
             bed_temp=70, fan_speed=80,
         )
-        r = resolve_preset(args)
+        r = _resolve_preset(args)
         assert r["start_temp"] == 250
         assert r["end_temp"] == 200
         assert r["bed_temp"] == 70

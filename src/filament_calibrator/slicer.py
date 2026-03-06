@@ -45,10 +45,8 @@ VASE_MODE_SLICER_ARGS: Dict[str, str] = {
     "first-layer-height": "0.2",
     "perimeters": "1",
     "top-solid-layers": "0",
-    "bottom-solid-layers": "0",
     "fill-density": "0%",
     "skirts": "0",
-    "brim-width": "5",
 }
 """Slicer defaults for vase-mode flow specimens.
 
@@ -94,10 +92,8 @@ EM_SLICER_ARGS: Dict[str, str] = {
     "first-layer-height": "0.2",
     "perimeters": "1",
     "top-solid-layers": "0",
-    "bottom-solid-layers": "0",
     "fill-density": "0%",
     "skirts": "0",
-    "brim-width": "5",
 }
 """Slicer defaults for extrusion multiplier calibration cubes.
 

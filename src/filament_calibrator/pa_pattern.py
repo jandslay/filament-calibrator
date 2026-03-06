@@ -354,5 +354,5 @@ def generate_pa_pattern_stl(
         labels = _make_labels(config, x_tips, pa_values, height)
         result = result.union(labels)
 
-    cq.exporters.export(result, output_path)
+    cq.exporters.export(result, output_path, exportType="STL")
     return output_path, x_tips
