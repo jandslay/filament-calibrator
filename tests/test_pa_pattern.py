@@ -411,7 +411,7 @@ class TestMakeLabels:
 
     @patch("filament_calibrator.pa_pattern.cq")
     def test_text_content_formatting(self, mock_cq):
-        """Each label uses f'{pa:.2f}' formatting."""
+        """Each label uses f'{pa:.3f}' formatting."""
         cfg = PAPatternConfig(num_patterns=2)
         x_tips = pattern_x_tips(cfg)
         pa_values = [0.03, 0.05]
@@ -429,8 +429,8 @@ class TestMakeLabels:
         _make_labels(cfg, x_tips, pa_values, 0.8)
 
         text_calls = mock_wp.text.call_args_list
-        assert text_calls[0][0][0] == "0.03"
-        assert text_calls[1][0][0] == "0.05"
+        assert text_calls[0][0][0] == "0.030"
+        assert text_calls[1][0][0] == "0.050"
 
     @patch("filament_calibrator.pa_pattern.cq")
     def test_bar_created_with_box(self, mock_cq):

@@ -305,7 +305,7 @@ def _make_labels(
     result = bar
     for tx, pa in zip(x_tips, pa_values):
         label_x = tx - arm_end_dx
-        label_text = f"{pa:.2f}"
+        label_text = f"{pa:.3f}"
         text_solid = (
             cq.Workplane("XY")
             .workplane(offset=height)
