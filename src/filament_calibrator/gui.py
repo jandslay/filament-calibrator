@@ -201,7 +201,7 @@ def build_pa_namespace(
     arm_length: float = 40.0,
     wall_count: int = 3,
     num_layers: int = 4,
-    pattern_spacing: float = 2.0,
+    pattern_spacing: float = 1.6,
     frame_offset: float = 3.0,
     printer: str,
     ascii_gcode: bool,
@@ -847,7 +847,7 @@ def _app() -> None:  # pragma: no cover
         pa_arm_length = 40.0
         pa_wall_count = 3
         pa_num_layers = 4
-        pa_pattern_spacing = 2.0
+        pa_pattern_spacing = 1.6
         pa_frame_offset = 3.0
         if method_key == "pattern":
             with st.expander("Pattern Settings"):
@@ -882,7 +882,7 @@ def _app() -> None:  # pragma: no cover
                 )
                 pa_pattern_spacing = st.number_input(
                     "Pattern Spacing (mm)",
-                    value=2.0,
+                    value=1.6,
                     min_value=0.0,
                     step=0.5,
                     key="pa_pattern_spacing",

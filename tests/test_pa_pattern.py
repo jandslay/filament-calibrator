@@ -47,7 +47,7 @@ class TestConstants:
         assert DEFAULT_NUM_LAYERS == 4
 
     def test_pattern_spacing(self):
-        assert DEFAULT_PATTERN_SPACING == 2.0
+        assert DEFAULT_PATTERN_SPACING == 1.6
 
     def test_wall_thickness(self):
         assert DEFAULT_WALL_THICKNESS == 1.6
@@ -69,7 +69,7 @@ class TestPAPatternConfig:
         assert cfg.arm_length == 40.0
         assert cfg.wall_count == 3
         assert cfg.num_layers == 4
-        assert cfg.pattern_spacing == 2.0
+        assert cfg.pattern_spacing == 1.6
         assert cfg.wall_thickness == 1.6
         assert cfg.frame_offset == 3.0
         assert cfg.layer_height == 0.2

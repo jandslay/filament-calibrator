@@ -147,7 +147,7 @@ class TestBuildParser:
         assert args.frame_offset == 3.0
         assert args.wall_count == 3
         assert args.num_layers == 4
-        assert args.pattern_spacing == 2.0
+        assert args.pattern_spacing == 1.6
 
     def test_pattern_options_custom(self):
         p = build_parser()
@@ -310,7 +310,7 @@ class TestRun:
             config=None, verbose=False,
             # Pattern-specific defaults (used when method="pattern")
             corner_angle=90.0, arm_length=40.0, frame_offset=3.0,
-            wall_count=3, num_layers=4, pattern_spacing=2.0,
+            wall_count=3, num_layers=4, pattern_spacing=1.6,
         )
         defaults.update(overrides)
         return argparse.Namespace(**defaults)
@@ -1202,7 +1202,7 @@ class TestRunPattern:
             ascii_gcode=False,
             config=None, verbose=False,
             corner_angle=90.0, arm_length=40.0, frame_offset=3.0,
-            wall_count=3, num_layers=4, pattern_spacing=2.0,
+            wall_count=3, num_layers=4, pattern_spacing=1.6,
         )
         defaults.update(overrides)
         return argparse.Namespace(**defaults)
