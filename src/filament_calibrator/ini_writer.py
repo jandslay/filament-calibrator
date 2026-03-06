@@ -32,9 +32,10 @@ class CalibrationResults:
     pa_value: Optional[float] = None
     """Pressure advance / linear advance value."""
 
-    pa_firmware: str = "marlin"
-    """Firmware flavour: ``"marlin"`` (M900) or ``"klipper"``
-    (SET_PRESSURE_ADVANCE)."""
+    printer: str = "COREONE"
+    """Printer model name.  Determines the PA G-code command:
+    ``"MINI"`` uses ``M900 K<value>`` (Linear Advance),
+    all others use ``M572 S<value>`` (Pressure Advance)."""
 
 
 # ---------------------------------------------------------------------------
@@ -68,15 +69,19 @@ def _replace_ini_value(
     return result, found
 
 
-def _pa_command(pa_value: float, firmware: str) -> str:
-    """Return the G-code command string for setting pressure advance."""
-    if firmware == "klipper":
-        return f"SET_PRESSURE_ADVANCE ADVANCE={pa_value:.4f}"
-    return f"M900 K{pa_value:.4f}"
+def _pa_command(pa_value: float, printer: str) -> str:
+    """Return the G-code command string for setting pressure advance.
+
+    The Prusa Mini uses Linear Advance (``M900 K``).  All other
+    Prusa printers use Pressure Advance (``M572 S``).
+    """
+    if printer.upper() == "MINI":
+        return f"M900 K{pa_value:.4f}"
+    return f"M572 S{pa_value:.4f}"
 
 
 _PA_LINE_RE = re.compile(
-    r"(M900\s+K[\d.]+|SET_PRESSURE_ADVANCE\s+ADVANCE=[\d.]+)",
+    r"(M572\s+S[\d.]+|M900\s+K[\d.]+)",
     re.IGNORECASE,
 )
 
@@ -84,20 +89,20 @@ _PA_LINE_RE = re.compile(
 def _inject_pa_into_start_gcode(
     lines: List[str],
     pa_value: float,
-    firmware: str,
+    printer: str,
 ) -> List[str]:
     r"""Insert or replace a PA command inside ``start_filament_gcode``.
 
     PrusaSlicer stores multi-line G-code values on a single INI line
     using literal ``\n`` escape sequences, e.g.::
 
-        start_filament_gcode = "M900 K0.04\nG92 E0"
+        start_filament_gcode = "M572 S0.04\nG92 E0"
 
     This function finds the ``start_filament_gcode`` key, then either
     replaces an existing PA command within the value or prepends one.
     If the key is absent the line is appended at the end.
     """
-    pa_cmd = _pa_command(pa_value, firmware)
+    pa_cmd = _pa_command(pa_value, printer)
     key_re = re.compile(r"^(\s*start_filament_gcode\s*=\s*)(.*)$")
 
     result: List[str] = []
@@ -184,7 +189,7 @@ def merge_results_into_ini(
     # --- Pressure advance (injected into start_filament_gcode) ---
     if results.pa_value is not None:
         lines = _inject_pa_into_start_gcode(
-            lines, results.pa_value, results.pa_firmware,
+            lines, results.pa_value, results.printer,
         )
 
     return "\n".join(lines) + "\n" if lines else ""
@@ -208,7 +213,7 @@ def build_change_summary(results: CalibrationResults) -> str:
         )
 
     if results.pa_value is not None:
-        cmd = _pa_command(results.pa_value, results.pa_firmware)
+        cmd = _pa_command(results.pa_value, results.printer)
         parts.append(
             f"- **Pressure advance:** `{cmd}` "
             f"(`start_filament_gcode`)"
