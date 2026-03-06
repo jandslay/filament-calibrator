@@ -152,15 +152,17 @@ class TestTotalHeight:
 
 class TestTipSpacing:
     def test_90_degree(self):
-        cfg = PAPatternConfig(num_patterns=3, pattern_spacing=2.0, corner_angle=90.0)
+        cfg = PAPatternConfig(num_patterns=3, pattern_spacing=2.0, corner_angle=90.0,
+                              wall_thickness=1.6)
         half = math.radians(45)
-        expected = 2.0 / math.sin(half)
+        expected = (2.0 + 1.6) / math.sin(half)
         assert tip_spacing(cfg) == pytest.approx(expected)
 
     def test_60_degree(self):
-        cfg = PAPatternConfig(num_patterns=3, pattern_spacing=3.0, corner_angle=60.0)
+        cfg = PAPatternConfig(num_patterns=3, pattern_spacing=3.0, corner_angle=60.0,
+                              wall_thickness=1.0)
         half = math.radians(30)
-        expected = 3.0 / math.sin(half)
+        expected = (3.0 + 1.0) / math.sin(half)
         assert tip_spacing(cfg) == pytest.approx(expected)
 
 

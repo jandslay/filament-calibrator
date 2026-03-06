@@ -111,12 +111,13 @@ def total_height(config: PAPatternConfig) -> float:
 def tip_spacing(config: PAPatternConfig) -> float:
     """Horizontal distance between adjacent chevron tips.
 
-    Adjacent chevron arms are parallel lines separated by
-    ``pattern_spacing`` (perpendicular distance).  The horizontal
-    distance between tips is ``pattern_spacing / sin(half_angle)``.
+    ``pattern_spacing`` is the **edge-to-edge** gap between adjacent
+    arms.  The perpendicular centre-to-centre distance is therefore
+    ``pattern_spacing + wall_thickness``, and the horizontal distance
+    between tips is ``(pattern_spacing + wall_thickness) / sin(α/2)``.
     """
     half = math.radians(config.corner_angle / 2)
-    return config.pattern_spacing / math.sin(half)
+    return (config.pattern_spacing + config.wall_thickness) / math.sin(half)
 
 
 def pattern_x_tips(config: PAPatternConfig) -> List[float]:
