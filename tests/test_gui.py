@@ -27,6 +27,7 @@ from filament_calibrator.gui import (
     get_preset,
     run_pipeline,
     snap_nozzle_size,
+    upload_to_printer,
 )
 
 
@@ -875,3 +876,60 @@ class TestApplyTomlToSession:
         state = {"_toml_filament_type": "PLA"}
         apply_toml_to_session(state, {"filament_type": "ABS"})
         assert state["_toml_filament_type"] == "PLA"
+
+
+# ---------------------------------------------------------------------------
+# upload_to_printer
+# ---------------------------------------------------------------------------
+
+class TestUploadToPrinter:
+    """Test upload_to_printer() PrusaLink upload wrapper."""
+
+    @patch("filament_calibrator.gui.gl.prusalink_upload",
+           return_value="tower_PLA.bgcode")
+    def test_success(self, mock_upload: MagicMock) -> None:
+        ok, msg = upload_to_printer(
+            printer_url="http://10.0.0.1",
+            api_key="key123",
+            gcode_path="/tmp/tower_PLA.bgcode",
+        )
+        assert ok is True
+        assert "tower_PLA.bgcode" in msg
+        assert "Print started" not in msg
+        mock_upload.assert_called_once_with(
+            base_url="http://10.0.0.1",
+            api_key="key123",
+            gcode_path="/tmp/tower_PLA.bgcode",
+            print_after_upload=False,
+        )
+
+    @patch("filament_calibrator.gui.gl.prusalink_upload",
+           return_value="flow_PLA.bgcode")
+    def test_success_with_print(self, mock_upload: MagicMock) -> None:
+        ok, msg = upload_to_printer(
+            printer_url="http://10.0.0.1",
+            api_key="key123",
+            gcode_path="/tmp/flow_PLA.bgcode",
+            print_after_upload=True,
+        )
+        assert ok is True
+        assert "flow_PLA.bgcode" in msg
+        assert "Print started" in msg
+        mock_upload.assert_called_once_with(
+            base_url="http://10.0.0.1",
+            api_key="key123",
+            gcode_path="/tmp/flow_PLA.bgcode",
+            print_after_upload=True,
+        )
+
+    @patch("filament_calibrator.gui.gl.prusalink_upload",
+           side_effect=ConnectionError("Connection refused"))
+    def test_failure(self, mock_upload: MagicMock) -> None:
+        ok, msg = upload_to_printer(
+            printer_url="http://10.0.0.1",
+            api_key="key123",
+            gcode_path="/tmp/tower.bgcode",
+        )
+        assert ok is False
+        assert "Upload failed" in msg
+        assert "Connection refused" in msg
