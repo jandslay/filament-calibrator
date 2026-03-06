@@ -523,6 +523,38 @@ def apply_ini_to_session(
 
 
 # ---------------------------------------------------------------------------
+# PrusaLink upload helper
+# ---------------------------------------------------------------------------
+
+
+def upload_to_printer(
+    printer_url: str,
+    api_key: str,
+    gcode_path: str,
+    print_after_upload: bool = False,
+) -> Tuple[bool, str]:
+    """Upload G-code to a PrusaLink printer.
+
+    Calls :func:`gcode_lib.prusalink_upload` and returns a
+    ``(success, message)`` tuple.  Any exception from the upload is
+    caught and reported as a failure message.
+    """
+    try:
+        filename = gl.prusalink_upload(
+            base_url=printer_url,
+            api_key=api_key,
+            gcode_path=gcode_path,
+            print_after_upload=print_after_upload,
+        )
+        msg = f"Uploaded as: {filename}"
+        if print_after_upload:
+            msg += "\nPrint started."
+        return True, msg
+    except Exception as exc:
+        return False, f"Upload failed: {exc}"
+
+
+# ---------------------------------------------------------------------------
 # Streamlit app (only imported when actually running the GUI)
 # ---------------------------------------------------------------------------
 
@@ -811,14 +843,30 @@ def _app() -> None:  # pragma: no cover
                 output_dir=run_dir,
                 config_ini=config_ini,
                 prusaslicer_path=prusaslicer_path,
-                printer_url=printer_url if enable_upload else None,
-                api_key=api_key if enable_upload else None,
-                no_upload=not enable_upload,
-                print_after_upload=print_after,
+                printer_url=None,
+                api_key=None,
+                no_upload=True,
+                print_after_upload=False,
             )
             with st.spinner("Running temperature tower pipeline..."):
                 success, log = run_pipeline(temp_run, args)
-            _show_results(st, run_dir, ascii_gcode, success, log)
+            st.session_state["_last_run"] = {
+                "output_dir": run_dir,
+                "ascii_gcode": ascii_gcode,
+                "success": success,
+                "log": log,
+                "tab": "temp",
+                "upload_enabled": enable_upload,
+                "printer_url": printer_url,
+                "api_key": api_key,
+                "print_after": print_after,
+            }
+            st.session_state.pop("_upload_status", None)
+            st.session_state.pop("_upload_message", None)
+
+        _run = st.session_state.get("_last_run")
+        if _run and _run["tab"] == "temp":
+            _show_results(st, _run)
 
     # === Tab 2: Volumetric Flow ===
     with tab_flow:
@@ -928,14 +976,30 @@ def _app() -> None:  # pragma: no cover
                 output_dir=run_dir,
                 config_ini=config_ini,
                 prusaslicer_path=prusaslicer_path,
-                printer_url=printer_url if enable_upload else None,
-                api_key=api_key if enable_upload else None,
-                no_upload=not enable_upload,
-                print_after_upload=print_after,
+                printer_url=None,
+                api_key=None,
+                no_upload=True,
+                print_after_upload=False,
             )
             with st.spinner("Running volumetric flow pipeline..."):
                 success, log = run_pipeline(flow_run, args)
-            _show_results(st, run_dir, ascii_gcode, success, log)
+            st.session_state["_last_run"] = {
+                "output_dir": run_dir,
+                "ascii_gcode": ascii_gcode,
+                "success": success,
+                "log": log,
+                "tab": "flow",
+                "upload_enabled": enable_upload,
+                "printer_url": printer_url,
+                "api_key": api_key,
+                "print_after": print_after,
+            }
+            st.session_state.pop("_upload_status", None)
+            st.session_state.pop("_upload_message", None)
+
+        _run = st.session_state.get("_last_run")
+        if _run and _run["tab"] == "flow":
+            _show_results(st, _run)
 
     # === Tab 3: Pressure Advance ===
     with tab_pa:
@@ -1133,24 +1197,42 @@ def _app() -> None:  # pragma: no cover
                 output_dir=run_dir,
                 config_ini=config_ini,
                 prusaslicer_path=prusaslicer_path,
-                printer_url=printer_url if enable_upload else None,
-                api_key=api_key if enable_upload else None,
-                no_upload=not enable_upload,
-                print_after_upload=print_after,
+                printer_url=None,
+                api_key=None,
+                no_upload=True,
+                print_after_upload=False,
             )
             with st.spinner("Running pressure advance pipeline..."):
                 success, log = run_pipeline(pa_run, args)
-            _show_results(st, run_dir, ascii_gcode, success, log)
+            st.session_state["_last_run"] = {
+                "output_dir": run_dir,
+                "ascii_gcode": ascii_gcode,
+                "success": success,
+                "log": log,
+                "tab": "pa",
+                "upload_enabled": enable_upload,
+                "printer_url": printer_url,
+                "api_key": api_key,
+                "print_after": print_after,
+            }
+            st.session_state.pop("_upload_status", None)
+            st.session_state.pop("_upload_message", None)
+
+        _run = st.session_state.get("_last_run")
+        if _run and _run["tab"] == "pa":
+            _show_results(st, _run)
 
 
 def _show_results(
     st: Any,
-    output_dir: str,
-    ascii_gcode: bool,
-    success: bool,
-    log: str,
+    run_info: Dict[str, Any],
 ) -> None:  # pragma: no cover
-    """Display pipeline results: status, download, thumbnail, log."""
+    """Display pipeline results: status, download, thumbnail, upload, log."""
+    output_dir = run_info["output_dir"]
+    ascii_gcode = run_info["ascii_gcode"]
+    success = run_info["success"]
+    log = run_info["log"]
+
     if success:
         st.success("Pipeline completed!")
     else:
@@ -1179,9 +1261,86 @@ def _show_results(
         except Exception:
             pass
 
+    # Upload section (only when pipeline succeeded and upload is configured)
+    if (
+        success
+        and run_info.get("upload_enabled")
+        and gcode_path is not None
+    ):
+        _show_upload_section(st, run_info, gcode_path)
+
     # Pipeline log
     with st.expander("Pipeline Log", expanded=not success):
         st.code(log)
+
+
+def _show_upload_section(
+    st: Any,
+    run_info: Dict[str, Any],
+    gcode_path: Path,
+) -> None:  # pragma: no cover
+    """Show upload confirmation, progress, and result."""
+    upload_status = st.session_state.get("_upload_status")
+
+    with st.container(border=True):
+        st.subheader("\U0001f4e4 Upload to Printer")
+
+        if upload_status is None:
+            # --- Confirmation step ---
+            file_size_mb = gcode_path.stat().st_size / (1024 * 1024)
+            st.markdown(
+                f"**Printer:** `{run_info['printer_url']}`  \n"
+                f"**File:** `{gcode_path.name}`  \n"
+                f"**Size:** {file_size_mb:.1f} MB  \n"
+                f"**Print after upload:** "
+                f"{'Yes' if run_info['print_after'] else 'No'}"
+            )
+            col_up, col_skip, _pad = st.columns([1, 1, 4])
+            with col_up:
+                if st.button(
+                    "Upload", type="primary", key="do_upload",
+                ):
+                    st.session_state["_upload_status"] = "uploading"
+                    st.rerun()
+            with col_skip:
+                if st.button("Skip", key="skip_upload"):
+                    st.session_state["_upload_status"] = "skipped"
+                    st.rerun()
+
+        elif upload_status == "uploading":
+            # --- Upload in progress ---
+            with st.spinner("Uploading to printer\u2026"):
+                ok, msg = upload_to_printer(
+                    printer_url=run_info["printer_url"],
+                    api_key=run_info["api_key"],
+                    gcode_path=str(gcode_path),
+                    print_after_upload=run_info["print_after"],
+                )
+            if ok:
+                st.session_state["_upload_status"] = "success"
+                st.session_state["_upload_message"] = msg
+            else:
+                st.session_state["_upload_status"] = "failed"
+                st.session_state["_upload_message"] = msg
+            st.rerun()
+
+        elif upload_status == "success":
+            st.success(
+                st.session_state.get("_upload_message", "Uploaded!")
+            )
+
+        elif upload_status == "failed":
+            st.error(
+                st.session_state.get(
+                    "_upload_message", "Upload failed."
+                )
+            )
+            if st.button("Retry Upload", key="retry_upload"):
+                st.session_state["_upload_status"] = "uploading"
+                st.rerun()
+
+        elif upload_status == "skipped":
+            st.info("Upload skipped.")
 
 
 # ---------------------------------------------------------------------------
