@@ -306,7 +306,7 @@ class TestBuildPaNamespace:
         assert ns.frame_offset == 3.0
         assert ns.wall_count == 3
         assert ns.num_layers == 4
-        assert ns.pattern_spacing == 2.0
+        assert ns.pattern_spacing == 1.6
 
     def test_method_pattern(self) -> None:
         ns = build_pa_namespace(

@@ -33,8 +33,11 @@ DEFAULT_WALL_COUNT: int = 3
 DEFAULT_NUM_LAYERS: int = 4
 """Number of printed layers."""
 
-DEFAULT_PATTERN_SPACING: float = 2.0
-"""Perpendicular gap between adjacent chevron arms in mm."""
+DEFAULT_PATTERN_SPACING: float = 1.6
+"""Perpendicular gap between adjacent chevron arms in mm.
+
+Defaults to ``DEFAULT_WALL_THICKNESS`` so the gap matches the line width.
+"""
 
 DEFAULT_WALL_THICKNESS: float = 1.6
 """Cross-section thickness of each chevron arm in mm."""
