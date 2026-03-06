@@ -152,8 +152,9 @@ The tools look for a config file in this order (first found wins):
 | 2 | `./filament-calibrator.toml` | Per-project settings |
 | 3 | `~/.config/filament-calibrator/config.toml` | User-wide defaults |
 
-CLI arguments always override config file values, so you can set your usual
-defaults in the file and override individual flags as needed.
+Config values are applied as defaults. CLI arguments usually override config
+file values; if a CLI value is identical to the built-in default, the config
+value may still apply.
 
 ---
 
@@ -224,7 +225,7 @@ must be evenly divisible by `--temp-step`.
 | `--fan-speed` | from preset | Fan speed (0--100%) |
 | `--config-ini` | | PrusaSlicer `.ini` config file |
 | `--prusaslicer-path` | auto-detect | Path to PrusaSlicer executable |
-| `--printer` | `COREONE` | Printer model — auto-sets bed center/shape, generates start/end G-code, and embeds printer metadata in bgcode |
+| `--printer` | `COREONE` | Printer model — auto-sets bed center/shape and embeds printer metadata in bgcode |
 | `--bed-center` | from `--printer` | Bed centre as X,Y in mm (auto-set by `--printer`) |
 | `--extra-slicer-args` | | Additional PrusaSlicer CLI args (must be last) |
 
@@ -637,11 +638,11 @@ These flags apply only when `--method pattern` is used:
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--corner-angle` | `90` | Full angle at the chevron tip in degrees |
-| `--arm-length` | `25.0` | Length of each chevron arm in mm |
+| `--corner-angle` | `90.0` | Full angle at the chevron tip in degrees |
+| `--arm-length` | `40.0` | Length of each chevron arm in mm |
 | `--wall-count` | `3` | Number of concentric perimeter walls |
-| `--num-layers` | `3` | Number of layers (height = num_layers × layer_height) |
-| `--pattern-spacing` | `2.0` | Spacing between chevron centres in mm |
+| `--num-layers` | `4` | Number of layers (height = num_layers × layer_height) |
+| `--pattern-spacing` | `1.6` | Perpendicular gap between chevron arms in mm |
 | `--frame-offset` | `3.0` | Distance from outermost chevron to frame edge in mm |
 
 #### Nozzle Options
@@ -789,10 +790,11 @@ Run tests:
 
 ```bash
 pip install -e ".[dev]"
-pytest tests/ --cov=src/filament_calibrator --cov-report=term-missing
+pytest tests/ --cov=src/filament_calibrator --cov-report=term-missing \
+  --cov-fail-under=100
 ```
 
-100% statement coverage is required and enforced via `--cov-fail-under=100`.
+This command enforces 100% statement coverage via `--cov-fail-under=100`.
 
 ## License
 
