@@ -537,9 +537,12 @@ class TestMakeLabels:
         _make_labels(cfg, x_tips, pa_values, 0.8)
 
         text_call = mock_wp.text.call_args
-        # text(label_text, font_size, label_depth, combine=False)
+        # text(label_text, font_size, label_depth, combine=False,
+        #      halign="center", valign="center")
         label_depth = text_call[0][2]
         assert label_depth == pytest.approx(0.15)
+        assert text_call[1]["halign"] == "center"
+        assert text_call[1]["valign"] == "center"
 
 
 # ---------------------------------------------------------------------------

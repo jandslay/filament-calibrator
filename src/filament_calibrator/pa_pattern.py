@@ -311,7 +311,10 @@ def _make_labels(
             .workplane(offset=height)
             .center(label_x, bar_cy)
             .transformed(rotate=(0, 0, 90))
-            .text(label_text, font_size, label_depth, combine=False)
+            .text(
+                label_text, font_size, label_depth,
+                combine=False, halign="center", valign="center",
+            )
         )
         result = result.union(text_solid)
 
