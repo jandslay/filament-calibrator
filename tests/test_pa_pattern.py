@@ -10,6 +10,7 @@ from filament_calibrator.pa_pattern import (
     DEFAULT_ARM_LENGTH,
     DEFAULT_CORNER_ANGLE,
     DEFAULT_FRAME_OFFSET,
+    DEFAULT_LABEL_HEIGHT,
     DEFAULT_NUM_LAYERS,
     DEFAULT_PATTERN_SPACING,
     DEFAULT_WALL_COUNT,
@@ -54,6 +55,9 @@ class TestConstants:
 
     def test_frame_offset(self):
         assert DEFAULT_FRAME_OFFSET == 3.0
+
+    def test_label_height(self):
+        assert DEFAULT_LABEL_HEIGHT == 5.0
 
 
 # ---------------------------------------------------------------------------
@@ -395,7 +399,7 @@ class TestMakeLabels:
         mock_wp.box.return_value = mock_wp
         mock_wp.translate.return_value = mock_wp
         mock_wp.workplane.return_value = mock_wp
-        mock_wp.moveTo.return_value = mock_wp
+        mock_wp.center.return_value = mock_wp
         mock_wp.text.return_value = mock_wp
         mock_wp.union.return_value = mock_wp
 
@@ -416,7 +420,7 @@ class TestMakeLabels:
         mock_wp.box.return_value = mock_wp
         mock_wp.translate.return_value = mock_wp
         mock_wp.workplane.return_value = mock_wp
-        mock_wp.moveTo.return_value = mock_wp
+        mock_wp.center.return_value = mock_wp
         mock_wp.text.return_value = mock_wp
         mock_wp.union.return_value = mock_wp
 
@@ -438,7 +442,7 @@ class TestMakeLabels:
         mock_wp.box.return_value = mock_wp
         mock_wp.translate.return_value = mock_wp
         mock_wp.workplane.return_value = mock_wp
-        mock_wp.moveTo.return_value = mock_wp
+        mock_wp.center.return_value = mock_wp
         mock_wp.text.return_value = mock_wp
         mock_wp.union.return_value = mock_wp
 
@@ -458,7 +462,7 @@ class TestMakeLabels:
         mock_wp.box.return_value = mock_wp
         mock_wp.translate.return_value = mock_wp
         mock_wp.workplane.return_value = mock_wp
-        mock_wp.moveTo.return_value = mock_wp
+        mock_wp.center.return_value = mock_wp
         mock_wp.text.return_value = mock_wp
         mock_wp.union.return_value = mock_wp
 
@@ -479,7 +483,7 @@ class TestMakeLabels:
         mock_wp.box.return_value = mock_wp
         mock_wp.translate.return_value = mock_wp
         mock_wp.workplane.return_value = mock_wp
-        mock_wp.moveTo.return_value = mock_wp
+        mock_wp.center.return_value = mock_wp
         mock_wp.text.return_value = mock_wp
         mock_wp.union.return_value = mock_wp
 
@@ -499,7 +503,7 @@ class TestMakeLabels:
         mock_wp.box.return_value = mock_wp
         mock_wp.translate.return_value = mock_wp
         mock_wp.workplane.return_value = mock_wp
-        mock_wp.moveTo.return_value = mock_wp
+        mock_wp.center.return_value = mock_wp
         mock_wp.text.return_value = mock_wp
         mock_wp.union.return_value = mock_wp
 

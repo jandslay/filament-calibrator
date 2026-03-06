@@ -45,6 +45,9 @@ DEFAULT_WALL_THICKNESS: float = 1.6
 DEFAULT_FRAME_OFFSET: float = 3.0
 """Margin between outermost chevron arm and inner frame edge in mm."""
 
+DEFAULT_LABEL_HEIGHT: float = 5.0
+"""Height of the label strip placed above the frame in mm."""
+
 
 # ---------------------------------------------------------------------------
 # Data structures
@@ -265,41 +268,44 @@ def _make_labels(
     pa_values: List[float],
     height: float,
 ) -> cq.Workplane:
-    """Create the label strip with embossed PA values above the chevrons."""
+    """Create the label strip with embossed PA values above the frame."""
     half = math.radians(config.corner_angle / 2)
     hw = config.wall_thickness / 2.0
 
-    # Position the label bar in the upper portion of the frame.
+    # Frame outer top edge Y.
     y_max_arm = config.arm_length * math.sin(half) + hw * math.cos(half)
-    label_y = y_max_arm + config.frame_offset * 0.5
+    frame_top = y_max_arm + config.frame_offset
 
-    # Label bar dimensions.
+    # Label strip sits above the frame.
+    label_strip_height = DEFAULT_LABEL_HEIGHT
+    bar_cy = frame_top + label_strip_height / 2.0
+
+    # Bar spans the full frame width.
     leftmost_tip = min(x_tips)
     rightmost_tip = max(x_tips)
     arm_lx = leftmost_tip - config.arm_length * math.cos(half)
-    bar_x_min = arm_lx - hw * math.sin(half) - config.frame_offset + config.wall_thickness
-    bar_x_max = rightmost_tip + hw / math.sin(half) + config.frame_offset - config.wall_thickness
+    bar_x_min = arm_lx - hw * math.sin(half) - config.frame_offset
+    bar_x_max = rightmost_tip + hw / math.sin(half) + config.frame_offset
     bar_width = bar_x_max - bar_x_min
-    bar_height = config.frame_offset - config.wall_thickness
     bar_cx = (bar_x_min + bar_x_max) / 2.0
 
-    # Flat bar (one layer thick).
+    # Flat bar (same height as chevrons).
     bar = (
         cq.Workplane("XY")
-        .box(bar_width, bar_height, height, centered=(True, True, False))
-        .translate((bar_cx, label_y, 0))
+        .box(bar_width, label_strip_height, height, centered=(True, True, False))
+        .translate((bar_cx, bar_cy, 0))
     )
 
     # Emboss labels on top of bar.
     label_depth = config.layer_height  # one layer raised
-    font_size = min(3.0, bar_height * 0.8)
+    font_size = min(3.0, label_strip_height * 0.7)
     result = bar
     for tx, pa in zip(x_tips, pa_values):
         label_text = f"{pa:.2f}"
         text_solid = (
             cq.Workplane("XY")
             .workplane(offset=height)
-            .moveTo(tx, label_y)
+            .center(tx, bar_cy)
             .text(label_text, font_size, label_depth, combine=False)
         )
         result = result.union(text_solid)
