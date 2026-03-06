@@ -902,7 +902,7 @@ def _app() -> None:  # pragma: no cover
         with col3:
             flow_step = st.number_input(
                 "Step (mm\u00b3/s)",
-                value=1.0,
+                value=0.5,
                 min_value=0.1,
                 step=0.5,
                 format="%.1f",
