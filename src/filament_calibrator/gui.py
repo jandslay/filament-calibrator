@@ -1256,17 +1256,27 @@ def _show_results(
                 mime="application/octet-stream",
             )
 
-    # Thumbnail preview (use most recent STL for shared output dirs)
+    # Thumbnail preview (use most recent STL for shared output dirs).
+    # Cache the rendered PNG in session state so the media-file ID stays
+    # stable across Streamlit reruns (avoids "Missing file" errors).
     stl_files = list(Path(output_dir).glob("*.stl"))
     if stl_files:
         newest_stl = max(stl_files, key=lambda f: f.stat().st_mtime)
-        try:
-            from filament_calibrator.thumbnail import render_stl_to_png
+        stl_key = str(newest_stl)
+        cached = st.session_state.get("_thumbnail_stl")
+        if cached == stl_key:
+            png_data = st.session_state.get("_thumbnail_png")
+        else:
+            try:
+                from filament_calibrator.thumbnail import render_stl_to_png
 
-            png_data = render_stl_to_png(str(newest_stl), 440, 248)
+                png_data = render_stl_to_png(str(newest_stl), 440, 248)
+                st.session_state["_thumbnail_stl"] = stl_key
+                st.session_state["_thumbnail_png"] = png_data
+            except Exception:
+                png_data = None
+        if png_data is not None:
             st.image(png_data, caption="Model Preview", width=440)
-        except Exception:
-            pass
 
     # Upload section (only when pipeline succeeded and upload is configured)
     if (
