@@ -21,6 +21,7 @@ from filament_calibrator.gui import (
     apply_ini_to_session,
     apply_toml_to_session,
     build_calibration_results,
+    build_em_namespace,
     build_flow_namespace,
     build_pa_namespace,
     build_temp_tower_namespace,
@@ -354,6 +355,66 @@ class TestBuildPaNamespace:
         assert ns.level_height == 2.0
         assert ns.firmware == "klipper"
         assert ns.ascii_gcode is True
+
+
+class TestBuildEmNamespace:
+    """Test build_em_namespace()."""
+
+    def test_basic(self) -> None:
+        ns = build_em_namespace(
+            filament_type="PLA",
+            cube_size=40.0,
+            nozzle_temp=215,
+            bed_temp=60,
+            fan_speed=100,
+            nozzle_size=0.4,
+            layer_height=0.2,
+            extrusion_width=0.45,
+            printer="COREONE",
+            ascii_gcode=False,
+            output_dir="/tmp/em",
+            config_ini=None,
+            prusaslicer_path=None,
+            printer_url=None,
+            api_key=None,
+            no_upload=True,
+            print_after_upload=False,
+        )
+        assert ns.filament_type == "PLA"
+        assert ns.cube_size == 40.0
+        assert ns.nozzle_temp == 215
+        assert ns.bed_temp == 60
+        assert ns.fan_speed == 100
+        assert ns.nozzle_size == 0.4
+        assert ns.layer_height == 0.2
+        assert ns.extrusion_width == 0.45
+        assert ns.printer == "COREONE"
+        assert ns.verbose is True
+
+    def test_empty_strings_become_none(self) -> None:
+        ns = build_em_namespace(
+            filament_type="PETG",
+            cube_size=30.0,
+            nozzle_temp=240,
+            bed_temp=80,
+            fan_speed=50,
+            nozzle_size=0.6,
+            layer_height=0.3,
+            extrusion_width=0.68,
+            printer="MK4S",
+            ascii_gcode=True,
+            output_dir="/tmp/em",
+            config_ini="",
+            prusaslicer_path="",
+            printer_url="",
+            api_key="",
+            no_upload=True,
+            print_after_upload=False,
+        )
+        assert ns.config_ini is None
+        assert ns.prusaslicer_path is None
+        assert ns.printer_url is None
+        assert ns.api_key is None
 
 
 # ---------------------------------------------------------------------------
@@ -732,23 +793,28 @@ class TestApplyIniToSession:
         }
         apply_ini_to_session(state, ini_vals)
 
-        # Nozzle temp → flow + PA tabs.
+        # Nozzle temp → EM + flow + PA tabs.
+        assert state["em_nozzle_temp"] == 220
         assert state["flow_nozzle_temp"] == 220
         assert state["pa_nozzle_temp"] == 220
 
-        # Bed temp → all three tabs.
+        # Bed temp → all four tabs.
         assert state["tt_bed_temp"] == 65
+        assert state["em_bed_temp"] == 65
         assert state["flow_bed_temp"] == 65
         assert state["pa_bed_temp"] == 65
 
-        # Fan speed → all three tabs.
+        # Fan speed → all four tabs.
         assert state["tt_fan"] == 80
+        assert state["em_fan"] == 80
         assert state["flow_fan"] == 80
         assert state["pa_fan"] == 80
 
-        # Layer height / extrusion width → flow + PA.
+        # Layer height / extrusion width → EM + flow + PA.
+        assert state["em_lh"] == 0.15
         assert state["flow_lh"] == 0.15
         assert state["pa_lh"] == 0.15
+        assert state["em_ew"] == 0.45
         assert state["flow_ew"] == 0.45
         assert state["pa_ew"] == 0.45
 
@@ -760,6 +826,7 @@ class TestApplyIniToSession:
     def test_partial_dict_only_temp(self) -> None:
         state: dict = {}
         apply_ini_to_session(state, {"nozzle_temp": 210})
+        assert state["em_nozzle_temp"] == 210
         assert state["flow_nozzle_temp"] == 210
         assert state["pa_nozzle_temp"] == 210
         assert "tt_bed_temp" not in state

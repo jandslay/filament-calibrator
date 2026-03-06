@@ -89,6 +89,24 @@ it is passed explicitly by :func:`slice_pa_pattern` so the user can
 control the number of concentric walls (``--wall-count``).
 """
 
+# Slicer settings for EM calibration cube (used when no .ini provided).
+EM_SLICER_ARGS: Dict[str, str] = {
+    "first-layer-height": "0.2",
+    "perimeters": "1",
+    "top-solid-layers": "0",
+    "bottom-solid-layers": "0",
+    "fill-density": "0%",
+    "skirts": "0",
+    "brim-width": "5",
+}
+"""Slicer defaults for extrusion multiplier calibration cubes.
+
+Single perimeter, no infill, no top/bottom layers — spiral-vase mode
+with classic perimeter generation.  ``layer-height`` and
+``extrusion-width`` are passed explicitly by :func:`slice_em_specimen`
+so they are **not** included here.
+"""
+
 
 # ---------------------------------------------------------------------------
 # Public API
@@ -517,6 +535,113 @@ def slice_pa_pattern(
     if end_gcode is not None:
         escaped = end_gcode.replace("\n", "\\n")
         cli_extra.append(f"--end-gcode={escaped}")
+
+    if extra_args:
+        cli_extra.extend(extra_args)
+
+    req = gl.SliceRequest(
+        input_path=stl_path,
+        output_path=output_gcode_path,
+        config_ini=config_ini,
+        extra_args=cli_extra,
+    )
+    return gl.slice_model(exe, req)
+
+
+def slice_em_specimen(
+    stl_path: str,
+    output_gcode_path: str,
+    layer_height: float = 0.2,
+    extrusion_width: float = 0.45,
+    config_ini: Optional[str] = None,
+    prusaslicer_path: Optional[str] = None,
+    extra_args: Optional[List[str]] = None,
+    nozzle_temp: Optional[int] = None,
+    bed_temp: Optional[int] = None,
+    fan_speed: Optional[int] = None,
+    bed_center: Optional[str] = None,
+    bed_shape: Optional[str] = None,
+    nozzle_diameter: Optional[float] = None,
+    printer_model: Optional[str] = None,
+    binary_gcode: bool = True,
+) -> gl.RunResult:
+    """Slice an extrusion multiplier calibration cube in vase mode.
+
+    Always enables ``--spiral-vase`` and ``--perimeter-generator=classic``
+    for a single classic-wall perimeter.  When *config_ini* is ``None``,
+    :data:`EM_SLICER_ARGS` are applied together with the explicit
+    *layer_height* and *extrusion_width*.
+
+    Parameters
+    ----------
+    stl_path:          Path to the input ``.stl`` file.
+    output_gcode_path: Desired output G-code path.
+    layer_height:      Layer height in mm (default 0.2).
+    extrusion_width:   Extrusion width in mm (default 0.45).
+    config_ini:        Optional PrusaSlicer ``.ini`` config file path.
+    prusaslicer_path:  Explicit path to PrusaSlicer executable (or ``None``
+                       to auto-detect).
+    extra_args:        Additional raw CLI arguments.
+    nozzle_temp:       Nozzle temperature in °C.
+    bed_temp:          Bed temperature in °C.
+    fan_speed:         Fan speed 0–100 %.
+    bed_center:        Bed centre as ``"X,Y"`` (defaults to
+                       :data:`DEFAULT_BED_CENTER`).
+    bed_shape:         Bed shape as PrusaSlicer ``--bed-shape`` string.
+                       Defaults to :data:`DEFAULT_BED_SHAPE`.
+    nozzle_diameter:   Nozzle diameter in mm (passed as
+                       ``--nozzle-diameter``).
+    printer_model:     Printer model identifier (e.g. ``"COREONE"``)
+                       passed as ``--printer-model``.
+
+    Returns
+    -------
+    gcode_lib.RunResult
+        Exit code, stdout, and stderr from PrusaSlicer.
+
+    Raises
+    ------
+    FileNotFoundError
+        If PrusaSlicer cannot be found.
+    """
+    exe = gl.find_prusaslicer_executable(explicit_path=prusaslicer_path)
+
+    cli_extra: List[str] = [
+        f"--center={bed_center or DEFAULT_BED_CENTER}",
+        f"--bed-shape={bed_shape or DEFAULT_BED_SHAPE}",
+        f"--thumbnails={DEFAULT_THUMBNAILS}",
+        "--spiral-vase",
+        "--perimeter-generator=classic",
+        # Always override settings that are incompatible with or required
+        # for spiral-vase mode, even when a user-supplied config.ini is
+        # loaded (it may have supports, solid bottoms, or no brim).
+        "--support-material=0",
+        "--bottom-solid-layers=0",
+        "--brim-width=5",
+    ]
+    if binary_gcode:
+        cli_extra.append("--binary-gcode")
+
+    if config_ini is None:
+        for key, val in EM_SLICER_ARGS.items():
+            cli_extra.append(f"--{key}={val}")
+        cli_extra.append(f"--layer-height={layer_height}")
+        cli_extra.append(f"--extrusion-width={extrusion_width}")
+
+    if nozzle_diameter is not None:
+        cli_extra.append(f"--nozzle-diameter={nozzle_diameter}")
+    if nozzle_temp is not None:
+        cli_extra.append(f"--temperature={nozzle_temp}")
+        cli_extra.append(f"--first-layer-temperature={nozzle_temp}")
+    if bed_temp is not None:
+        cli_extra.append(f"--bed-temperature={bed_temp}")
+        cli_extra.append(f"--first-layer-bed-temperature={bed_temp}")
+    if fan_speed is not None:
+        cli_extra.append(f"--max-fan-speed={fan_speed}")
+        cli_extra.append(f"--min-fan-speed={fan_speed}")
+
+    if printer_model is not None:
+        cli_extra.append(f"--printer-model={printer_model}")
 
     if extra_args:
         cli_extra.extend(extra_args)

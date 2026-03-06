@@ -11,9 +11,11 @@ from filament_calibrator.slicer import (
     DEFAULT_BED_CENTER,
     DEFAULT_SLICER_ARGS,
     DEFAULT_THUMBNAILS,
+    EM_SLICER_ARGS,
     PA_PATTERN_SLICER_ARGS,
     PA_SLICER_ARGS,
     VASE_MODE_SLICER_ARGS,
+    slice_em_specimen,
     slice_flow_specimen,
     slice_pa_pattern,
     slice_pa_specimen,
@@ -1515,3 +1517,332 @@ class TestSlicePAPattern:
 
         req = mock_slice.call_args[0][1]
         assert "--nozzle-diameter=0.6" in req.extra_args
+
+
+# ---------------------------------------------------------------------------
+# EM_SLICER_ARGS
+# ---------------------------------------------------------------------------
+
+
+class TestEmSlicerArgs:
+    def test_has_required_keys(self):
+        assert "first-layer-height" in EM_SLICER_ARGS
+        assert "perimeters" in EM_SLICER_ARGS
+        assert "top-solid-layers" in EM_SLICER_ARGS
+        assert "bottom-solid-layers" in EM_SLICER_ARGS
+        assert "fill-density" in EM_SLICER_ARGS
+        assert "brim-width" in EM_SLICER_ARGS
+
+    def test_em_values(self):
+        assert EM_SLICER_ARGS["perimeters"] == "1"
+        assert EM_SLICER_ARGS["top-solid-layers"] == "0"
+        assert EM_SLICER_ARGS["bottom-solid-layers"] == "0"
+        assert EM_SLICER_ARGS["fill-density"] == "0%"
+        assert EM_SLICER_ARGS["skirts"] == "0"
+        assert EM_SLICER_ARGS["brim-width"] == "5"
+
+    def test_no_layer_height(self):
+        """layer-height is NOT in EM_SLICER_ARGS (set explicitly)."""
+        assert "layer-height" not in EM_SLICER_ARGS
+
+
+# ---------------------------------------------------------------------------
+# slice_em_specimen
+# ---------------------------------------------------------------------------
+
+
+class TestSliceEmSpecimen:
+    @patch("filament_calibrator.slicer.gl.slice_model")
+    @patch("filament_calibrator.slicer.gl.find_prusaslicer_executable")
+    def test_spiral_vase_always_present(self, mock_find, mock_slice):
+        """--spiral-vase is always in the CLI args."""
+        mock_find.return_value = "/usr/bin/prusa-slicer"
+        mock_slice.return_value = gl.RunResult(
+            cmd=[], returncode=0, stdout="", stderr=""
+        )
+
+        slice_em_specimen("/tmp/cube.stl", "/tmp/cube.gcode")
+
+        req = mock_slice.call_args[0][1]
+        assert "--spiral-vase" in req.extra_args
+
+    @patch("filament_calibrator.slicer.gl.slice_model")
+    @patch("filament_calibrator.slicer.gl.find_prusaslicer_executable")
+    def test_perimeter_generator_classic(self, mock_find, mock_slice):
+        """--perimeter-generator=classic is always in the CLI args."""
+        mock_find.return_value = "/usr/bin/prusa-slicer"
+        mock_slice.return_value = gl.RunResult(
+            cmd=[], returncode=0, stdout="", stderr=""
+        )
+
+        slice_em_specimen("/tmp/cube.stl", "/tmp/cube.gcode")
+
+        req = mock_slice.call_args[0][1]
+        assert "--perimeter-generator=classic" in req.extra_args
+
+    @patch("filament_calibrator.slicer.gl.slice_model")
+    @patch("filament_calibrator.slicer.gl.find_prusaslicer_executable")
+    def test_supports_disabled(self, mock_find, mock_slice):
+        """--support-material=0 always present (incompatible with vase)."""
+        mock_find.return_value = "/usr/bin/prusa-slicer"
+        mock_slice.return_value = gl.RunResult(
+            cmd=[], returncode=0, stdout="", stderr=""
+        )
+
+        slice_em_specimen("/tmp/cube.stl", "/tmp/cube.gcode")
+
+        req = mock_slice.call_args[0][1]
+        assert "--support-material=0" in req.extra_args
+
+    @patch("filament_calibrator.slicer.gl.slice_model")
+    @patch("filament_calibrator.slicer.gl.find_prusaslicer_executable")
+    def test_bottom_layers_zero_and_brim_always(self, mock_find, mock_slice):
+        """--bottom-solid-layers=0 and --brim-width=5 always present."""
+        mock_find.return_value = "/usr/bin/prusa-slicer"
+        mock_slice.return_value = gl.RunResult(
+            cmd=[], returncode=0, stdout="", stderr=""
+        )
+
+        # With config_ini to ensure they're always applied.
+        slice_em_specimen(
+            "/tmp/cube.stl", "/tmp/cube.gcode",
+            config_ini="/some/config.ini",
+        )
+
+        req = mock_slice.call_args[0][1]
+        assert "--bottom-solid-layers=0" in req.extra_args
+        assert "--brim-width=5" in req.extra_args
+
+    @patch("filament_calibrator.slicer.gl.slice_model")
+    @patch("filament_calibrator.slicer.gl.find_prusaslicer_executable")
+    def test_em_defaults_used_without_config_ini(self, mock_find, mock_slice):
+        """EM_SLICER_ARGS applied when no config_ini."""
+        mock_find.return_value = "/usr/bin/prusa-slicer"
+        mock_slice.return_value = gl.RunResult(
+            cmd=[], returncode=0, stdout="", stderr=""
+        )
+
+        slice_em_specimen("/tmp/cube.stl", "/tmp/cube.gcode")
+
+        req = mock_slice.call_args[0][1]
+        for key, val in EM_SLICER_ARGS.items():
+            assert f"--{key}={val}" in req.extra_args
+        assert "--layer-height=0.2" in req.extra_args
+        assert "--extrusion-width=0.45" in req.extra_args
+
+    @patch("filament_calibrator.slicer.gl.slice_model")
+    @patch("filament_calibrator.slicer.gl.find_prusaslicer_executable")
+    def test_no_em_defaults_with_config_ini(self, mock_find, mock_slice):
+        """EM_SLICER_ARGS NOT applied when config_ini is given
+        (except bottom-solid-layers and brim-width which are always forced)."""
+        mock_find.return_value = "/usr/bin/prusa-slicer"
+        mock_slice.return_value = gl.RunResult(
+            cmd=[], returncode=0, stdout="", stderr=""
+        )
+
+        slice_em_specimen(
+            "/tmp/cube.stl", "/tmp/cube.gcode",
+            config_ini="/config.ini",
+        )
+
+        _always_forced = {"bottom-solid-layers", "brim-width"}
+        req = mock_slice.call_args[0][1]
+        for key, val in EM_SLICER_ARGS.items():
+            if key in _always_forced:
+                continue
+            assert f"--{key}={val}" not in req.extra_args
+        # --spiral-vase and --perimeter-generator still present
+        assert "--spiral-vase" in req.extra_args
+        assert "--perimeter-generator=classic" in req.extra_args
+
+    @patch("filament_calibrator.slicer.gl.slice_model")
+    @patch("filament_calibrator.slicer.gl.find_prusaslicer_executable")
+    def test_nozzle_temp_passed(self, mock_find, mock_slice):
+        mock_find.return_value = "/usr/bin/prusa-slicer"
+        mock_slice.return_value = gl.RunResult(
+            cmd=[], returncode=0, stdout="", stderr=""
+        )
+
+        slice_em_specimen(
+            "/tmp/cube.stl", "/tmp/cube.gcode",
+            config_ini="/config.ini", nozzle_temp=210,
+        )
+
+        req = mock_slice.call_args[0][1]
+        assert "--temperature=210" in req.extra_args
+        assert "--first-layer-temperature=210" in req.extra_args
+
+    @patch("filament_calibrator.slicer.gl.slice_model")
+    @patch("filament_calibrator.slicer.gl.find_prusaslicer_executable")
+    def test_bed_temp_and_fan_speed(self, mock_find, mock_slice):
+        mock_find.return_value = "/usr/bin/prusa-slicer"
+        mock_slice.return_value = gl.RunResult(
+            cmd=[], returncode=0, stdout="", stderr=""
+        )
+
+        slice_em_specimen(
+            "/tmp/cube.stl", "/tmp/cube.gcode",
+            config_ini="/config.ini", bed_temp=60, fan_speed=100,
+        )
+
+        req = mock_slice.call_args[0][1]
+        assert "--bed-temperature=60" in req.extra_args
+        assert "--first-layer-bed-temperature=60" in req.extra_args
+        assert "--max-fan-speed=100" in req.extra_args
+        assert "--min-fan-speed=100" in req.extra_args
+
+    @patch("filament_calibrator.slicer.gl.slice_model")
+    @patch("filament_calibrator.slicer.gl.find_prusaslicer_executable")
+    def test_none_temps_not_added(self, mock_find, mock_slice):
+        mock_find.return_value = "/usr/bin/prusa-slicer"
+        mock_slice.return_value = gl.RunResult(
+            cmd=[], returncode=0, stdout="", stderr=""
+        )
+
+        slice_em_specimen(
+            "/tmp/cube.stl", "/tmp/cube.gcode",
+            config_ini="/config.ini",
+            nozzle_temp=None, bed_temp=None, fan_speed=None,
+        )
+
+        req = mock_slice.call_args[0][1]
+        assert not any(a.startswith("--temperature=") for a in req.extra_args)
+        assert not any(a.startswith("--bed-temperature") for a in req.extra_args)
+        assert not any(a.startswith("--max-fan-speed") for a in req.extra_args)
+
+    @patch("filament_calibrator.slicer.gl.slice_model")
+    @patch("filament_calibrator.slicer.gl.find_prusaslicer_executable")
+    def test_default_bed_center(self, mock_find, mock_slice):
+        mock_find.return_value = "/usr/bin/prusa-slicer"
+        mock_slice.return_value = gl.RunResult(
+            cmd=[], returncode=0, stdout="", stderr=""
+        )
+
+        slice_em_specimen("/tmp/cube.stl", "/tmp/cube.gcode",
+                          config_ini="/config.ini")
+
+        req = mock_slice.call_args[0][1]
+        assert f"--center={DEFAULT_BED_CENTER}" in req.extra_args
+
+    @patch("filament_calibrator.slicer.gl.slice_model")
+    @patch("filament_calibrator.slicer.gl.find_prusaslicer_executable")
+    def test_custom_bed_center(self, mock_find, mock_slice):
+        mock_find.return_value = "/usr/bin/prusa-slicer"
+        mock_slice.return_value = gl.RunResult(
+            cmd=[], returncode=0, stdout="", stderr=""
+        )
+
+        slice_em_specimen(
+            "/tmp/cube.stl", "/tmp/cube.gcode",
+            config_ini="/config.ini", bed_center="90,90",
+        )
+
+        req = mock_slice.call_args[0][1]
+        assert "--center=90,90" in req.extra_args
+
+    @patch("filament_calibrator.slicer.gl.slice_model")
+    @patch("filament_calibrator.slicer.gl.find_prusaslicer_executable")
+    def test_custom_prusaslicer_path(self, mock_find, mock_slice):
+        mock_find.return_value = "/custom/prusa-slicer"
+        mock_slice.return_value = gl.RunResult(
+            cmd=[], returncode=0, stdout="", stderr=""
+        )
+
+        slice_em_specimen(
+            "/tmp/cube.stl", "/tmp/cube.gcode",
+            prusaslicer_path="/custom/prusa-slicer",
+        )
+
+        mock_find.assert_called_once_with(
+            explicit_path="/custom/prusa-slicer"
+        )
+
+    @patch("filament_calibrator.slicer.gl.slice_model")
+    @patch("filament_calibrator.slicer.gl.find_prusaslicer_executable")
+    def test_thumbnails_in_args(self, mock_find, mock_slice):
+        """--thumbnails is always present in slice_em_specimen CLI args."""
+        mock_find.return_value = "/usr/bin/prusa-slicer"
+        mock_slice.return_value = gl.RunResult(
+            cmd=[], returncode=0, stdout="", stderr=""
+        )
+
+        slice_em_specimen("/tmp/cube.stl", "/tmp/cube.gcode")
+
+        req = mock_slice.call_args[0][1]
+        assert f"--thumbnails={DEFAULT_THUMBNAILS}" in req.extra_args
+
+    @patch("filament_calibrator.slicer.gl.slice_model")
+    @patch("filament_calibrator.slicer.gl.find_prusaslicer_executable")
+    def test_nozzle_diameter_passed(self, mock_find, mock_slice):
+        mock_find.return_value = "/usr/bin/prusa-slicer"
+        mock_slice.return_value = gl.RunResult(
+            cmd=[], returncode=0, stdout="", stderr=""
+        )
+
+        slice_em_specimen("/tmp/cube.stl", "/tmp/cube.gcode",
+                          nozzle_diameter=0.6)
+
+        req = mock_slice.call_args[0][1]
+        assert "--nozzle-diameter=0.6" in req.extra_args
+
+    @patch("filament_calibrator.slicer.gl.slice_model")
+    @patch("filament_calibrator.slicer.gl.find_prusaslicer_executable")
+    def test_binary_gcode_default(self, mock_find, mock_slice):
+        """binary_gcode defaults to True → --binary-gcode present."""
+        mock_find.return_value = "/usr/bin/prusa-slicer"
+        mock_slice.return_value = gl.RunResult(
+            cmd=[], returncode=0, stdout="", stderr=""
+        )
+
+        slice_em_specimen("/tmp/cube.stl", "/tmp/cube.gcode")
+
+        req = mock_slice.call_args[0][1]
+        assert "--binary-gcode" in req.extra_args
+
+    @patch("filament_calibrator.slicer.gl.slice_model")
+    @patch("filament_calibrator.slicer.gl.find_prusaslicer_executable")
+    def test_binary_gcode_false(self, mock_find, mock_slice):
+        """binary_gcode=False → --binary-gcode NOT present."""
+        mock_find.return_value = "/usr/bin/prusa-slicer"
+        mock_slice.return_value = gl.RunResult(
+            cmd=[], returncode=0, stdout="", stderr=""
+        )
+
+        slice_em_specimen("/tmp/cube.stl", "/tmp/cube.gcode",
+                          binary_gcode=False)
+
+        req = mock_slice.call_args[0][1]
+        assert "--binary-gcode" not in req.extra_args
+
+    @patch("filament_calibrator.slicer.gl.slice_model")
+    @patch("filament_calibrator.slicer.gl.find_prusaslicer_executable")
+    def test_printer_model_passed(self, mock_find, mock_slice):
+        """printer_model adds --printer-model to CLI args."""
+        mock_find.return_value = "/usr/bin/prusa-slicer"
+        mock_slice.return_value = gl.RunResult(
+            cmd=[], returncode=0, stdout="", stderr=""
+        )
+
+        slice_em_specimen("/tmp/cube.stl", "/tmp/cube.gcode",
+                          printer_model="COREONE")
+
+        req = mock_slice.call_args[0][1]
+        assert "--printer-model=COREONE" in req.extra_args
+
+    @patch("filament_calibrator.slicer.gl.slice_model")
+    @patch("filament_calibrator.slicer.gl.find_prusaslicer_executable")
+    def test_extra_args_appended(self, mock_find, mock_slice):
+        mock_find.return_value = "/usr/bin/prusa-slicer"
+        mock_slice.return_value = gl.RunResult(
+            cmd=[], returncode=0, stdout="", stderr=""
+        )
+
+        slice_em_specimen(
+            "/tmp/cube.stl", "/tmp/cube.gcode",
+            config_ini="/config.ini",
+            extra_args=["--custom", "val"],
+        )
+
+        req = mock_slice.call_args[0][1]
+        assert "--custom" in req.extra_args
+        assert "val" in req.extra_args

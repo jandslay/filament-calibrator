@@ -258,6 +258,53 @@ def build_pa_namespace(
     )
 
 
+def build_em_namespace(
+    *,
+    filament_type: str,
+    cube_size: float,
+    nozzle_temp: int,
+    bed_temp: int,
+    fan_speed: int,
+    nozzle_size: float,
+    layer_height: float,
+    extrusion_width: float,
+    printer: str,
+    ascii_gcode: bool,
+    output_dir: str,
+    config_ini: Optional[str],
+    prusaslicer_path: Optional[str],
+    printer_url: Optional[str],
+    api_key: Optional[str],
+    no_upload: bool,
+    print_after_upload: bool,
+) -> argparse.Namespace:
+    """Build an ``argparse.Namespace`` for the extrusion-multiplier pipeline."""
+    return argparse.Namespace(
+        filament_type=filament_type,
+        cube_size=cube_size,
+        nozzle_temp=nozzle_temp,
+        bed_temp=bed_temp,
+        fan_speed=fan_speed,
+        nozzle_size=nozzle_size,
+        layer_height=layer_height,
+        extrusion_width=extrusion_width,
+        printer=printer,
+        ascii_gcode=ascii_gcode,
+        output_dir=output_dir,
+        config_ini=config_ini or None,
+        prusaslicer_path=prusaslicer_path or None,
+        bed_center=None,
+        extra_slicer_args=None,
+        printer_url=printer_url or None,
+        api_key=api_key or None,
+        no_upload=no_upload,
+        print_after_upload=print_after_upload,
+        config=None,
+        keep_files=True,
+        verbose=True,
+    )
+
+
 def _fresh_output_dir(custom_output_dir: str) -> str:
     """Return *custom_output_dir* if set, otherwise a fresh temp directory.
 
@@ -483,28 +530,33 @@ def apply_ini_to_session(
     """
     if "nozzle_temp" in ini_vals:
         nt = ini_vals["nozzle_temp"]
+        state["em_nozzle_temp"] = nt
         state["flow_nozzle_temp"] = nt
         state["pa_nozzle_temp"] = nt
 
     if "bed_temp" in ini_vals:
         bt = ini_vals["bed_temp"]
         state["tt_bed_temp"] = bt
+        state["em_bed_temp"] = bt
         state["flow_bed_temp"] = bt
         state["pa_bed_temp"] = bt
 
     if "fan_speed" in ini_vals:
         fs = ini_vals["fan_speed"]
         state["tt_fan"] = fs
+        state["em_fan"] = fs
         state["flow_fan"] = fs
         state["pa_fan"] = fs
 
     if "layer_height" in ini_vals:
         lh = ini_vals["layer_height"]
+        state["em_lh"] = lh
         state["flow_lh"] = lh
         state["pa_lh"] = lh
 
     if "extrusion_width" in ini_vals:
         ew = ini_vals["extrusion_width"]
+        state["em_ew"] = ew
         state["flow_ew"] = ew
         state["pa_ew"] = ew
 
@@ -775,6 +827,11 @@ def _app() -> None:  # pragma: no cover
     _widget_defaults = {
         "tt_bed_temp": preset["bed"],
         "tt_fan": preset["fan"],
+        "em_nozzle_temp": preset["hotend"],
+        "em_bed_temp": preset["bed"],
+        "em_fan": preset["fan"],
+        "em_lh": derived_lh,
+        "em_ew": derived_ew,
         "flow_nozzle_temp": preset["hotend"],
         "flow_bed_temp": preset["bed"],
         "flow_fan": preset["fan"],
@@ -791,9 +848,9 @@ def _app() -> None:  # pragma: no cover
             st.session_state[_wk] = _wv
 
     # --- Tabs ---
-    tab_temp, tab_flow, tab_pa, tab_results = st.tabs([
-        "Temperature Tower", "Volumetric Flow", "Pressure Advance",
-        "Results",
+    tab_temp, tab_em, tab_flow, tab_pa, tab_results = st.tabs([
+        "Temperature Tower", "Extrusion Multiplier", "Volumetric Flow",
+        "Pressure Advance", "Results",
     ])
 
     # === Tab 1: Temperature Tower ===
@@ -904,7 +961,110 @@ def _app() -> None:  # pragma: no cover
         if _run and _run["tab"] == "temp":
             _show_results(st, _run)
 
-    # === Tab 2: Volumetric Flow ===
+    # === Tab 2: Extrusion Multiplier ===
+    with tab_em:
+        st.subheader("Extrusion Multiplier")
+        st.caption(
+            "Generate a 40mm cube sliced in vase mode with classic walls. "
+            "Print it, measure the wall thickness with calipers, and "
+            "calculate: EM = expected_width / measured_width."
+        )
+
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            em_nozzle_temp = st.number_input(
+                "Nozzle Temp (\u00b0C)",
+                min_value=150,
+                max_value=350,
+                key="em_nozzle_temp",
+            )
+        with col2:
+            em_bed_temp = st.number_input(
+                "Bed Temp (\u00b0C)",
+                min_value=0,
+                max_value=150,
+                key="em_bed_temp",
+            )
+        with col3:
+            em_fan = st.number_input(
+                "Fan Speed (%)",
+                min_value=0,
+                max_value=100,
+                key="em_fan",
+            )
+
+        with st.expander("Advanced Settings"):
+            em_cube_size = st.number_input(
+                "Cube Size (mm)",
+                value=40.0,
+                min_value=5.0,
+                max_value=200.0,
+                step=5.0,
+                key="em_cube_size",
+            )
+            em_layer_height = st.number_input(
+                "Layer Height (mm)",
+                min_value=0.05,
+                max_value=1.0,
+                format="%.2f",
+                key="em_lh",
+            )
+            em_extrusion_width = st.number_input(
+                "Extrusion Width (mm)",
+                min_value=0.1,
+                max_value=2.0,
+                format="%.2f",
+                key="em_ew",
+            )
+
+        st.info(f"Expected wall thickness: {em_extrusion_width:.2f} mm")
+
+        if st.button("Generate EM Cube", type="primary",
+                      key="run_em"):
+            from filament_calibrator.em_cli import run as em_run
+
+            run_dir = _fresh_output_dir(custom_output_dir)
+            args = build_em_namespace(
+                filament_type=filament_type,
+                cube_size=em_cube_size,
+                nozzle_temp=em_nozzle_temp,
+                bed_temp=em_bed_temp,
+                fan_speed=em_fan,
+                nozzle_size=nozzle_size,
+                layer_height=em_layer_height,
+                extrusion_width=em_extrusion_width,
+                printer=printer,
+                ascii_gcode=ascii_gcode,
+                output_dir=run_dir,
+                config_ini=config_ini,
+                prusaslicer_path=prusaslicer_path,
+                printer_url=None,
+                api_key=None,
+                no_upload=True,
+                print_after_upload=False,
+            )
+            with st.spinner("Running extrusion multiplier pipeline..."):
+                success, log = run_pipeline(em_run, args)
+            st.session_state["_last_run"] = {
+                "output_dir": run_dir,
+                "ascii_gcode": ascii_gcode,
+                "success": success,
+                "log": log,
+                "tab": "em",
+                "upload_enabled": enable_upload,
+                "printer_url": printer_url,
+                "api_key": api_key,
+            }
+            st.session_state.pop("_upload_status", None)
+            st.session_state.pop("_upload_message", None)
+            st.session_state.pop("_print_after", None)
+            st.session_state.pop("upload_print_after", None)
+
+        _run = st.session_state.get("_last_run")
+        if _run and _run["tab"] == "em":
+            _show_results(st, _run)
+
+    # === Tab 3: Volumetric Flow ===
     with tab_flow:
         st.subheader("Volumetric Flow")
         st.caption(
@@ -1038,7 +1198,7 @@ def _app() -> None:  # pragma: no cover
         if _run and _run["tab"] == "flow":
             _show_results(st, _run)
 
-    # === Tab 3: Pressure Advance ===
+    # === Tab 4: Pressure Advance ===
     with tab_pa:
         st.subheader("Pressure Advance")
         pa_method = st.radio(
@@ -1254,7 +1414,7 @@ def _app() -> None:  # pragma: no cover
         if _run and _run["tab"] == "pa":
             _show_results(st, _run)
 
-    # === Tab 4: Calibration Results ===
+    # === Tab 5: Calibration Results ===
     with tab_results:
         st.subheader("Calibration Results")
         st.markdown(
