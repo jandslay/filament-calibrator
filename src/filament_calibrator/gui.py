@@ -566,18 +566,20 @@ def build_calibration_results(
     max_volumetric_speed: float,
     set_pa: bool,
     pa_value: float,
+    printer: str,
 ) -> CalibrationResults:
     """Build a :class:`CalibrationResults` from GUI widget values.
 
     Checkbox flags (``set_*``) gate which values are included;
-    unchecked values are stored as ``None``.  Firmware is always
-    ``"marlin"`` (M900) in the GUI.
+    unchecked values are stored as ``None``.  The *printer* name
+    determines the PA G-code command (M572 for most Prusa printers,
+    M900 for the Mini).
     """
     return CalibrationResults(
         temperature=temperature if set_temp else None,
         max_volumetric_speed=max_volumetric_speed if set_flow else None,
         pa_value=pa_value if set_pa else None,
-        pa_firmware="marlin",
+        printer=printer,
     )
 
 
@@ -1293,6 +1295,7 @@ def _app() -> None:  # pragma: no cover
             set_temp=set_temp, temperature=int(res_temp),
             set_flow=set_flow, max_volumetric_speed=float(res_flow),
             set_pa=set_pa, pa_value=float(res_pa),
+            printer=printer,
         )
 
         # Show change summary
