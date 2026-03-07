@@ -668,17 +668,20 @@ def _app() -> None:  # pragma: no cover
             st.session_state[_key] = st.session_state.pop(_pending)
 
     # Parse .ini and auto-populate fields when the path changes.
+    # _ini_vals is kept alive so that, after _widget_defaults overwrites
+    # tab keys with preset defaults, we can re-apply INI overrides.
+    _ini_vals: Dict[str, Any] = {}
     _cur_ini = st.session_state.get("config_ini", "")
     _prev_ini = st.session_state.get("_prev_config_ini", "")
     if _cur_ini != _prev_ini:
         st.session_state["_prev_config_ini"] = _cur_ini
         if _cur_ini and Path(_cur_ini).is_file():
             try:
-                ini_vals = gl.parse_prusaslicer_ini(_cur_ini)
+                _ini_vals = gl.parse_prusaslicer_ini(_cur_ini)
             except Exception:
-                ini_vals = {}
-            if ini_vals:
-                apply_ini_to_session(st.session_state, ini_vals)
+                _ini_vals = {}
+            if _ini_vals:
+                apply_ini_to_session(st.session_state, _ini_vals)
 
     # Selectbox defaults (must be set before widgets render).
     # Uses TOML values as defaults on first load; .ini values are written
@@ -818,10 +821,19 @@ def _app() -> None:  # pragma: no cover
     derived_lh = round(nozzle_size * 0.5, 2)
     derived_ew = round(nozzle_size * 1.125, 2)
 
-    # Set default session-state values for keyed widgets.  Only sets the
-    # value when the key is NEW (first render).  This avoids the Streamlit
-    # warning that fires when both ``value=`` and a session-state key
-    # are provided to the same widget.
+    # Set default session-state values for keyed widgets.
+    #
+    # On first render *or* when the filament preset / nozzle size changes,
+    # force-write new preset defaults so every tab reflects the updated
+    # values.  If an .ini was loaded in this same render cycle, its
+    # explicit values are re-applied afterwards so they always win.
+    _prev_ft = st.session_state.get("_preset_filament_type")
+    _prev_ns = st.session_state.get("_preset_nozzle_size")
+    _defaults_changed = _prev_ft != filament_type or _prev_ns != nozzle_size
+    if _defaults_changed:
+        st.session_state["_preset_filament_type"] = filament_type
+        st.session_state["_preset_nozzle_size"] = nozzle_size
+
     _widget_defaults = {
         "tt_bed_temp": preset["bed"],
         "tt_fan": preset["fan"],
@@ -842,8 +854,13 @@ def _app() -> None:  # pragma: no cover
         "pa_ew": derived_ew,
     }
     for _wk, _wv in _widget_defaults.items():
-        if _wk not in st.session_state:
+        if _wk not in st.session_state or _defaults_changed:
             st.session_state[_wk] = _wv
+
+    # Re-apply INI overrides — explicit config values take priority
+    # over preset defaults.
+    if _ini_vals:
+        apply_ini_to_session(st.session_state, _ini_vals)
 
     # --- Tabs ---
     tab_temp, tab_em, tab_flow, tab_pa, tab_results = st.tabs([
