@@ -813,16 +813,18 @@ def _app() -> None:  # pragma: no cover
             options=_NOZZLE_SIZES,
             key="sidebar_nozzle_size",
         )
-        nozzle_high_flow = st.checkbox(
-            "High Flow",
-            value=False,
-            help="Nozzle is a high-flow variant (sets F flag in M862.1)",
-        )
-        nozzle_hardened = st.checkbox(
-            "Hardened",
-            value=False,
-            help="Nozzle is hardened/abrasive-resistant (sets A flag in M862.1)",
-        )
+        _nozzle_indent, _nozzle_col = st.columns([0.12, 0.88])
+        with _nozzle_col:
+            nozzle_high_flow = st.checkbox(
+                "High Flow",
+                value=False,
+                help="Nozzle is a high-flow variant (sets F flag in M862.1)",
+            )
+            nozzle_hardened = st.checkbox(
+                "Hardened",
+                value=False,
+                help="Nozzle is hardened/abrasive-resistant (sets A flag in M862.1)",
+            )
 
         ascii_gcode = st.checkbox(
             "ASCII G-code (.gcode)",
