@@ -23,6 +23,7 @@ from filament_calibrator.pa_pattern import (
     chevron_x_extent,
     chevron_y_extent,
     generate_pa_pattern_stl,
+    pattern_x_bounds,
     pattern_x_tips,
     tip_spacing,
     total_height,
@@ -205,6 +206,18 @@ class TestPatternXTips:
     def test_count_matches_num_patterns(self):
         cfg = PAPatternConfig(num_patterns=7)
         assert len(pattern_x_tips(cfg)) == 7
+
+
+# ---------------------------------------------------------------------------
+# pattern_x_bounds
+# ---------------------------------------------------------------------------
+
+
+class TestPatternXBounds:
+    def test_empty_tips_raises(self):
+        cfg = PAPatternConfig(num_patterns=0)
+        with pytest.raises(ValueError, match="at least one tip"):
+            pattern_x_bounds(cfg, x_tips=[])
 
 
 # ---------------------------------------------------------------------------
