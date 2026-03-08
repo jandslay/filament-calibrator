@@ -5,7 +5,7 @@ Build with:  pyinstaller filament-calibrator.spec
 Output:      dist/FilamentCalibrator/  (--onedir mode)
 """
 
-from PyInstaller.utils.hooks import collect_all
+from PyInstaller.utils.hooks import collect_all, copy_metadata
 
 block_cipher = None
 
@@ -71,6 +71,14 @@ for pkg in ("streamlit", "cadquery", "OCP", "gcode_lib"):
         a.hiddenimports += hiddenimports
     except Exception:
         pass  # Package may not be installed
+
+# Include package metadata (.dist-info) for packages that use
+# importlib.metadata at runtime (e.g. streamlit reads its own version).
+for pkg in ("streamlit", "filament-calibrator", "gcode-lib"):
+    try:
+        a.datas += _to_3_tuples(copy_metadata(pkg), "DATA")
+    except Exception:
+        pass
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
