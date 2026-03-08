@@ -769,32 +769,37 @@ class TestApplyIniToSession:
         }
         apply_ini_to_session(state, ini_vals)
 
-        # Nozzle temp → EM + flow + PA tabs, temp tower range.
+        # Nozzle temp → EM + flow + PA + retraction tabs, temp tower range.
         assert state["em_nozzle_temp"] == 220
         assert state["flow_nozzle_temp"] == 220
         assert state["pa_nozzle_temp"] == 220
+        assert state["retraction_nozzle_temp"] == 220
         assert state["tt_start_temp"] == 235
         assert state["tt_end_temp"] == 205
 
-        # Bed temp → all four tabs.
+        # Bed temp → all five tabs.
         assert state["tt_bed_temp"] == 65
         assert state["em_bed_temp"] == 65
         assert state["flow_bed_temp"] == 65
         assert state["pa_bed_temp"] == 65
+        assert state["retraction_bed_temp"] == 65
 
-        # Fan speed → all four tabs.
+        # Fan speed → all five tabs.
         assert state["tt_fan"] == 80
         assert state["em_fan"] == 80
         assert state["flow_fan"] == 80
         assert state["pa_fan"] == 80
+        assert state["retraction_fan"] == 80
 
-        # Layer height / extrusion width → EM + flow + PA.
+        # Layer height / extrusion width → EM + flow + PA + retraction.
         assert state["em_lh"] == 0.15
         assert state["flow_lh"] == 0.15
         assert state["pa_lh"] == 0.15
+        assert state["retraction_lh"] == 0.15
         assert state["em_ew"] == 0.45
         assert state["flow_ew"] == 0.45
         assert state["pa_ew"] == 0.45
+        assert state["retraction_ew"] == 0.45
 
         # Selectbox widget keys (written directly for Streamlit key= binding).
         assert state["sidebar_nozzle_size"] == 0.4
@@ -806,6 +811,7 @@ class TestApplyIniToSession:
         assert state["em_nozzle_temp"] == 210
         assert state["flow_nozzle_temp"] == 210
         assert state["pa_nozzle_temp"] == 210
+        assert state["retraction_nozzle_temp"] == 210
         assert state["tt_start_temp"] == 225
         assert state["tt_end_temp"] == 195
         assert "tt_bed_temp" not in state
@@ -1018,12 +1024,14 @@ class TestBuildCalibrationResults:
             set_flow=True, max_volumetric_speed=12.5,
             set_pa=True, pa_value=0.04,
             set_em=True, extrusion_multiplier=0.95,
+            set_retraction=True, retraction_length=0.6,
             printer="COREONE",
         )
         assert r.temperature == 215
         assert r.max_volumetric_speed == 12.5
         assert r.pa_value == 0.04
         assert r.extrusion_multiplier == 0.95
+        assert r.retraction_length == 0.6
         assert r.printer == "COREONE"
 
     def test_none_set(self) -> None:
@@ -1032,12 +1040,14 @@ class TestBuildCalibrationResults:
             set_flow=False, max_volumetric_speed=12.5,
             set_pa=False, pa_value=0.04,
             set_em=False, extrusion_multiplier=0.95,
+            set_retraction=False, retraction_length=0.8,
             printer="COREONE",
         )
         assert r.temperature is None
         assert r.max_volumetric_speed is None
         assert r.pa_value is None
         assert r.extrusion_multiplier is None
+        assert r.retraction_length is None
         assert r.printer == "COREONE"
 
     def test_partial_temp_only(self) -> None:
@@ -1046,12 +1056,14 @@ class TestBuildCalibrationResults:
             set_flow=False, max_volumetric_speed=11.0,
             set_pa=False, pa_value=0.04,
             set_em=False, extrusion_multiplier=1.0,
+            set_retraction=False, retraction_length=0.8,
             printer="MINI",
         )
         assert r.temperature == 230
         assert r.max_volumetric_speed is None
         assert r.pa_value is None
         assert r.extrusion_multiplier is None
+        assert r.retraction_length is None
         assert r.printer == "MINI"
 
     def test_partial_em_only(self) -> None:
@@ -1060,10 +1072,24 @@ class TestBuildCalibrationResults:
             set_flow=False, max_volumetric_speed=11.0,
             set_pa=False, pa_value=0.04,
             set_em=True, extrusion_multiplier=0.97,
+            set_retraction=False, retraction_length=0.8,
             printer="COREONE",
         )
         assert r.temperature is None
         assert r.extrusion_multiplier == 0.97
+        assert r.retraction_length is None
+
+    def test_partial_retraction_only(self) -> None:
+        r = build_calibration_results(
+            set_temp=False, temperature=215,
+            set_flow=False, max_volumetric_speed=11.0,
+            set_pa=False, pa_value=0.04,
+            set_em=False, extrusion_multiplier=1.0,
+            set_retraction=True, retraction_length=0.6,
+            printer="COREONE",
+        )
+        assert r.temperature is None
+        assert r.retraction_length == 0.6
 
 
 # ---------------------------------------------------------------------------
