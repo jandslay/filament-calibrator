@@ -20,27 +20,27 @@ Install from PyPI (requires **Python 3.10 or 3.12** and **PrusaSlicer** on
 your PATH):
 
 ```bash
-uv tool install filament-calibrator
+uv tool install "filament-calibrator[gui]" --python 3.12
 ```
 
 Or download a standalone GUI binary from
 [Releases](https://github.com/hyiger/filament-calibrator/releases) — no
 Python needed.
 
-See the full [installation guide](docs/installation.md) for all options.
+## Documentation
 
-## Configuration
-
-Save printer URL, API key, filament type, and other defaults in a
-[TOML config file](docs/configuration.md) to avoid repeating them on every
-run.
+- **[Installation Guide](docs/installation.md)** — PyPI, standalone GUI,
+  Windows, Raspberry Pi, conda, and source install options
+- **[GUI User's Guide](docs/gui.md)** — walkthrough of the browser
+  interface with screenshots
+- **[Configuration](docs/configuration.md)** — TOML config file for saving
+  printer URL, API key, filament type, and other defaults
 
 ## GUI
 
-A [Streamlit browser GUI](docs/gui.md) wraps all six tools:
+A [browser-based GUI](docs/gui.md) wraps all six tools:
 
 ```bash
-pip install -e ".[gui]"
 filament-calibrator-gui
 ```
 
