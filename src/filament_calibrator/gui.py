@@ -1094,10 +1094,10 @@ def _app() -> None:  # pragma: no cover
         apply_ini_to_session(st.session_state, _ini_vals, sidebar=False)
 
     # --- Tabs ---
-    (tab_temp, tab_em, tab_flow, tab_pa, tab_retraction,
+    (tab_temp, tab_em, tab_retraction, tab_pa, tab_flow,
      tab_shrinkage, tab_results) = st.tabs([
-        "Temperature Tower", "Extrusion Multiplier", "Volumetric Flow",
-        "Pressure Advance", "Retraction", "Shrinkage", "Results",
+        "Temperature Tower", "Extrusion Multiplier", "Retraction",
+        "Pressure Advance", "Volumetric Flow", "Shrinkage", "Results",
     ])
 
     # === Tab 1: Temperature Tower ===
@@ -1323,117 +1323,122 @@ def _app() -> None:  # pragma: no cover
         if _run and _run["tab"] == "em":
             _show_results(st, _run)
 
-    # === Tab 3: Volumetric Flow ===
-    with tab_flow:
-        st.subheader("Volumetric Flow")
+    # === Tab 3: Retraction ===
+    with tab_retraction:
+        st.subheader("Retraction")
         st.caption(
-            "Generate a serpentine vase-mode specimen with increasing "
-            "print speeds to find maximum volumetric flow rate."
+            "Generate two cylindrical towers spaced apart. Travel moves "
+            "between them trigger retraction. Retraction length changes "
+            "at each height level so you can inspect stringing."
         )
 
         col1, col2, col3 = st.columns(3)
         with col1:
-            start_speed = st.number_input(
-                "Start Speed (mm\u00b3/s)",
-                value=5.0,
-                min_value=0.1,
-                step=0.5,
+            start_retraction = st.number_input(
+                "Start Retraction (mm)",
+                value=0.0,
+                min_value=0.0,
+                step=0.1,
                 format="%.1f",
             )
         with col2:
-            end_speed = st.number_input(
-                "End Speed (mm\u00b3/s)",
-                value=20.0,
-                min_value=0.1,
-                step=0.5,
+            end_retraction = st.number_input(
+                "End Retraction (mm)",
+                value=2.0,
+                min_value=0.0,
+                step=0.1,
                 format="%.1f",
             )
         with col3:
-            flow_step = st.number_input(
-                "Step (mm\u00b3/s)",
-                value=0.5,
-                min_value=0.1,
-                step=0.5,
-                format="%.1f",
+            retraction_step_val = st.number_input(
+                "Step (mm)",
+                value=0.1,
+                min_value=0.01,
+                step=0.1,
+                format="%.2f",
             )
 
         col4, col5, col6 = st.columns(3)
         with col4:
-            flow_nozzle_temp = st.number_input(
+            retraction_nozzle_temp = st.number_input(
                 "Nozzle Temp (\u00b0C)",
                 min_value=150,
                 max_value=350,
-                key="flow_nozzle_temp",
+                key="retraction_nozzle_temp",
             )
         with col5:
-            flow_bed_temp = st.number_input(
+            retraction_bed_temp = st.number_input(
                 "Bed Temp (\u00b0C)",
                 min_value=0,
                 max_value=150,
-                key="flow_bed_temp",
+                key="retraction_bed_temp",
             )
         with col6:
-            flow_fan = st.number_input(
+            retraction_fan = st.number_input(
                 "Fan Speed (%)",
                 min_value=0,
                 max_value=100,
-                key="flow_fan",
+                key="retraction_fan",
             )
 
+        retraction_level_height = 1.0
         with st.expander("Advanced Slicer Settings"):
-            flow_level_height = st.number_input(
+            retraction_level_height = st.number_input(
                 "Level Height (mm)",
                 value=1.0,
                 min_value=0.2,
                 step=0.5,
-                key="flow_level_height",
+                key="retraction_level_height",
             )
-            flow_layer_height = st.number_input(
+            retraction_layer_height = st.number_input(
                 "Layer Height (mm)",
                 min_value=0.05,
                 max_value=1.0,
                 format="%.2f",
-                key="flow_lh",
+                key="retraction_lh",
             )
-            flow_extrusion_width = st.number_input(
+            retraction_extrusion_width = st.number_input(
                 "Extrusion Width (mm)",
                 min_value=0.1,
                 max_value=2.0,
                 format="%.2f",
-                key="flow_ew",
+                key="retraction_ew",
             )
 
         # Level count preview
-        if end_speed > start_speed and flow_step > 0:
-            num_levels = round((end_speed - start_speed) / flow_step) + 1
+        if end_retraction > start_retraction and retraction_step_val > 0:
+            num_levels = (
+                round((end_retraction - start_retraction) / retraction_step_val)
+                + 1
+            )
             st.info(
                 f"{num_levels} levels: "
-                f"{start_speed:.1f} \u2192 {end_speed:.1f} mm\u00b3/s"
+                f"{start_retraction:.1f} \u2192 {end_retraction:.1f} mm"
             )
 
-        if st.button("Generate Flow Specimen", type="primary",
-                      key="run_flow"):
+        if st.button("Generate Retraction", type="primary",
+                      key="run_retraction"):
             _temp_err = _check_printer_temps(
-                printer, flow_nozzle_temp, flow_bed_temp,
+                printer, retraction_nozzle_temp, retraction_bed_temp,
             )
             if _temp_err:
                 st.error(_temp_err)
                 st.stop()
             run_dir = _fresh_output_dir(custom_output_dir)
-            args = build_flow_namespace(
+            args = build_retraction_namespace(
                 filament_type=filament_type,
-                start_speed=start_speed,
-                end_speed=end_speed,
-                step=flow_step,
-                level_height=flow_level_height,
-                nozzle_temp=flow_nozzle_temp,
-                bed_temp=flow_bed_temp,
-                fan_speed=flow_fan,
+                start_retraction=start_retraction,
+                end_retraction=end_retraction,
+                retraction_step=retraction_step_val,
+                level_height=retraction_level_height,
+                nozzle_temp=retraction_nozzle_temp,
+                bed_temp=retraction_bed_temp,
+                fan_speed=retraction_fan,
                 nozzle_size=nozzle_size,
                 nozzle_high_flow=nozzle_high_flow,
                 nozzle_hardened=nozzle_hardened,
-                layer_height=flow_layer_height,
-                extrusion_width=flow_extrusion_width,
+                layer_height=retraction_layer_height,
+                extrusion_width=retraction_extrusion_width,
                 printer=printer,
                 ascii_gcode=ascii_gcode,
                 output_dir=run_dir,
@@ -1444,14 +1449,14 @@ def _app() -> None:  # pragma: no cover
                 no_upload=True,
                 print_after_upload=False,
             )
-            with st.spinner("Running volumetric flow pipeline..."):
-                success, log = run_pipeline(flow_run, args)
+            with st.spinner("Running retraction test pipeline..."):
+                success, log = run_pipeline(retraction_run, args)
             st.session_state["_last_run"] = {
                 "output_dir": run_dir,
                 "ascii_gcode": ascii_gcode,
                 "success": success,
                 "log": log,
-                "tab": "flow",
+                "tab": "retraction",
                 "upload_enabled": enable_upload,
                 "printer_url": printer_url,
                 "api_key": api_key,
@@ -1462,7 +1467,7 @@ def _app() -> None:  # pragma: no cover
             st.session_state.pop("upload_print_after", None)
 
         _run = st.session_state.get("_last_run")
-        if _run and _run["tab"] == "flow":
+        if _run and _run["tab"] == "retraction":
             _show_results(st, _run)
 
     # === Tab 4: Pressure Advance ===
@@ -1697,122 +1702,117 @@ def _app() -> None:  # pragma: no cover
         if _run and _run["tab"] == "pa":
             _show_results(st, _run)
 
-    # === Tab 5: Retraction ===
-    with tab_retraction:
-        st.subheader("Retraction")
+    # === Tab 5: Volumetric Flow ===
+    with tab_flow:
+        st.subheader("Volumetric Flow")
         st.caption(
-            "Generate two cylindrical towers spaced apart. Travel moves "
-            "between them trigger retraction. Retraction length changes "
-            "at each height level so you can inspect stringing."
+            "Generate a serpentine vase-mode specimen with increasing "
+            "print speeds to find maximum volumetric flow rate."
         )
 
         col1, col2, col3 = st.columns(3)
         with col1:
-            start_retraction = st.number_input(
-                "Start Retraction (mm)",
-                value=0.0,
-                min_value=0.0,
-                step=0.1,
+            start_speed = st.number_input(
+                "Start Speed (mm\u00b3/s)",
+                value=5.0,
+                min_value=0.1,
+                step=0.5,
                 format="%.1f",
             )
         with col2:
-            end_retraction = st.number_input(
-                "End Retraction (mm)",
-                value=2.0,
-                min_value=0.0,
-                step=0.1,
+            end_speed = st.number_input(
+                "End Speed (mm\u00b3/s)",
+                value=20.0,
+                min_value=0.1,
+                step=0.5,
                 format="%.1f",
             )
         with col3:
-            retraction_step_val = st.number_input(
-                "Step (mm)",
-                value=0.1,
-                min_value=0.01,
-                step=0.1,
-                format="%.2f",
+            flow_step = st.number_input(
+                "Step (mm\u00b3/s)",
+                value=0.5,
+                min_value=0.1,
+                step=0.5,
+                format="%.1f",
             )
 
         col4, col5, col6 = st.columns(3)
         with col4:
-            retraction_nozzle_temp = st.number_input(
+            flow_nozzle_temp = st.number_input(
                 "Nozzle Temp (\u00b0C)",
                 min_value=150,
                 max_value=350,
-                key="retraction_nozzle_temp",
+                key="flow_nozzle_temp",
             )
         with col5:
-            retraction_bed_temp = st.number_input(
+            flow_bed_temp = st.number_input(
                 "Bed Temp (\u00b0C)",
                 min_value=0,
                 max_value=150,
-                key="retraction_bed_temp",
+                key="flow_bed_temp",
             )
         with col6:
-            retraction_fan = st.number_input(
+            flow_fan = st.number_input(
                 "Fan Speed (%)",
                 min_value=0,
                 max_value=100,
-                key="retraction_fan",
+                key="flow_fan",
             )
 
-        retraction_level_height = 1.0
         with st.expander("Advanced Slicer Settings"):
-            retraction_level_height = st.number_input(
+            flow_level_height = st.number_input(
                 "Level Height (mm)",
                 value=1.0,
                 min_value=0.2,
                 step=0.5,
-                key="retraction_level_height",
+                key="flow_level_height",
             )
-            retraction_layer_height = st.number_input(
+            flow_layer_height = st.number_input(
                 "Layer Height (mm)",
                 min_value=0.05,
                 max_value=1.0,
                 format="%.2f",
-                key="retraction_lh",
+                key="flow_lh",
             )
-            retraction_extrusion_width = st.number_input(
+            flow_extrusion_width = st.number_input(
                 "Extrusion Width (mm)",
                 min_value=0.1,
                 max_value=2.0,
                 format="%.2f",
-                key="retraction_ew",
+                key="flow_ew",
             )
 
         # Level count preview
-        if end_retraction > start_retraction and retraction_step_val > 0:
-            num_levels = (
-                round((end_retraction - start_retraction) / retraction_step_val)
-                + 1
-            )
+        if end_speed > start_speed and flow_step > 0:
+            num_levels = round((end_speed - start_speed) / flow_step) + 1
             st.info(
                 f"{num_levels} levels: "
-                f"{start_retraction:.1f} \u2192 {end_retraction:.1f} mm"
+                f"{start_speed:.1f} \u2192 {end_speed:.1f} mm\u00b3/s"
             )
 
-        if st.button("Generate Retraction", type="primary",
-                      key="run_retraction"):
+        if st.button("Generate Flow Specimen", type="primary",
+                      key="run_flow"):
             _temp_err = _check_printer_temps(
-                printer, retraction_nozzle_temp, retraction_bed_temp,
+                printer, flow_nozzle_temp, flow_bed_temp,
             )
             if _temp_err:
                 st.error(_temp_err)
                 st.stop()
             run_dir = _fresh_output_dir(custom_output_dir)
-            args = build_retraction_namespace(
+            args = build_flow_namespace(
                 filament_type=filament_type,
-                start_retraction=start_retraction,
-                end_retraction=end_retraction,
-                retraction_step=retraction_step_val,
-                level_height=retraction_level_height,
-                nozzle_temp=retraction_nozzle_temp,
-                bed_temp=retraction_bed_temp,
-                fan_speed=retraction_fan,
+                start_speed=start_speed,
+                end_speed=end_speed,
+                step=flow_step,
+                level_height=flow_level_height,
+                nozzle_temp=flow_nozzle_temp,
+                bed_temp=flow_bed_temp,
+                fan_speed=flow_fan,
                 nozzle_size=nozzle_size,
                 nozzle_high_flow=nozzle_high_flow,
                 nozzle_hardened=nozzle_hardened,
-                layer_height=retraction_layer_height,
-                extrusion_width=retraction_extrusion_width,
+                layer_height=flow_layer_height,
+                extrusion_width=flow_extrusion_width,
                 printer=printer,
                 ascii_gcode=ascii_gcode,
                 output_dir=run_dir,
@@ -1823,14 +1823,14 @@ def _app() -> None:  # pragma: no cover
                 no_upload=True,
                 print_after_upload=False,
             )
-            with st.spinner("Running retraction test pipeline..."):
-                success, log = run_pipeline(retraction_run, args)
+            with st.spinner("Running volumetric flow pipeline..."):
+                success, log = run_pipeline(flow_run, args)
             st.session_state["_last_run"] = {
                 "output_dir": run_dir,
                 "ascii_gcode": ascii_gcode,
                 "success": success,
                 "log": log,
-                "tab": "retraction",
+                "tab": "flow",
                 "upload_enabled": enable_upload,
                 "printer_url": printer_url,
                 "api_key": api_key,
@@ -1841,7 +1841,7 @@ def _app() -> None:  # pragma: no cover
             st.session_state.pop("upload_print_after", None)
 
         _run = st.session_state.get("_last_run")
-        if _run and _run["tab"] == "retraction":
+        if _run and _run["tab"] == "flow":
             _show_results(st, _run)
 
     # === Tab 6: Shrinkage ===
@@ -1974,25 +1974,6 @@ def _app() -> None:  # pragma: no cover
             disabled=not set_temp, key="res_temp",
         )
 
-        # Volumetric flow result
-        set_flow = st.checkbox(
-            "Set max volumetric speed", key="res_set_flow",
-        )
-        res_flow = st.number_input(
-            "Max volumetric speed (mm³/s)", 0.5, 50.0, 11.0,
-            step=0.5, disabled=not set_flow, key="res_flow",
-        )
-
-        # Pressure advance result
-        set_pa = st.checkbox(
-            "Set pressure advance", key="res_set_pa",
-        )
-        res_pa = st.number_input(
-            "PA value", 0.0000, 2.0000, 0.0400,
-            step=0.005, format="%.4f",
-            disabled=not set_pa, key="res_pa",
-        )
-
         # Extrusion multiplier result
         set_em = st.checkbox(
             "Set extrusion multiplier", key="res_set_em",
@@ -2011,6 +1992,25 @@ def _app() -> None:  # pragma: no cover
             "Retraction length (mm)", 0.0, 10.0, 0.8,
             step=0.1, format="%.1f",
             disabled=not set_retraction, key="res_retraction",
+        )
+
+        # Pressure advance result
+        set_pa = st.checkbox(
+            "Set pressure advance", key="res_set_pa",
+        )
+        res_pa = st.number_input(
+            "PA value", 0.0000, 2.0000, 0.0400,
+            step=0.005, format="%.4f",
+            disabled=not set_pa, key="res_pa",
+        )
+
+        # Volumetric flow result
+        set_flow = st.checkbox(
+            "Set max volumetric speed", key="res_set_flow",
+        )
+        res_flow = st.number_input(
+            "Max volumetric speed (mm³/s)", 0.5, 50.0, 11.0,
+            step=0.5, disabled=not set_flow, key="res_flow",
         )
 
         # Build results object
