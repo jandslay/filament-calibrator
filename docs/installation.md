@@ -43,8 +43,12 @@ Streamlit GUI in your browser.
 
 Available for Linux (x86_64), macOS (ARM64 and Intel), and Windows (x86_64).
 
-> **macOS note:** Unsigned binaries are blocked by Gatekeeper. Right-click the
-> app and select "Open" to bypass the warning on first launch.
+> **macOS note:** Downloaded binaries are quarantined by Gatekeeper. Remove
+> the quarantine attribute before running:
+>
+> ```bash
+> xattr -cr ~/Downloads/FilamentCalibrator
+> ```
 
 ## Install from source
 
