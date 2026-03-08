@@ -2,7 +2,7 @@
 
 ## Filament Presets
 
-All five tools use presets from `gcode-lib` to set smart defaults for each filament
+All six tools use presets from `gcode-lib` to set smart defaults for each filament
 type. Known presets: **ABS**, **ASA**, **HIPS**, **PA**, **PA-CF**, **PC**,
 **PCTG**, **PETG**, **PETG-CF**, **PLA**, **PLA-CF**, **PP**, **PPA**, **TPU**.
 
@@ -51,6 +51,13 @@ api-key = "your-prusalink-api-key"
 # Defaults
 filament-type = "PLA"
 output-dir = "./output"
+
+# Temperature overrides — applied to all tools that accept these flags.
+# These override the preset defaults but are in turn overridden by
+# explicit CLI flags (--nozzle-temp, --bed-temp, --fan-speed).
+# nozzle-temp = 215
+# bed-temp = 60
+# fan-speed = 100
 ```
 
 All keys are optional — include only what you need. In particular,
@@ -58,7 +65,7 @@ All keys are optional — include only what you need. In particular,
 location (e.g. `/usr/bin/prusa-slicer`, `/Applications/PrusaSlicer.app`, or
 anywhere on your `PATH`).
 
-The config file is shared between all five tools.
+The config file is shared between all six tools.
 
 ### Config file locations
 

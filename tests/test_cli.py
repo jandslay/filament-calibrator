@@ -252,6 +252,46 @@ class TestApplyConfig:
         # Legacy: current == default → overwritten
         assert args.printer == "MINI"
 
+    def test_applies_temperature_keys(self):
+        """nozzle_temp, bed_temp, fan_speed from TOML override _UNSET defaults."""
+        args = argparse.Namespace(
+            printer_url=None, api_key=None, prusaslicer_path=None,
+            config_ini=None, filament_type="PLA", output_dir=None,
+            bed_center=None, nozzle_size=0.4,
+            nozzle_temp=_UNSET, bed_temp=_UNSET, fan_speed=_UNSET,
+            nozzle_high_flow=False, nozzle_hardened=False,
+            printer="COREONE",
+        )
+        config = {
+            "nozzle_temp": 250,
+            "bed_temp": 100,
+            "fan_speed": 50,
+        }
+        _apply_config(args, config)
+        assert args.nozzle_temp == 250
+        assert args.bed_temp == 100
+        assert args.fan_speed == 50
+
+    def test_cli_temp_overrides_config(self):
+        """CLI-supplied temperature values are not overwritten by TOML."""
+        args = argparse.Namespace(
+            printer_url=None, api_key=None, prusaslicer_path=None,
+            config_ini=None, filament_type="PLA", output_dir=None,
+            bed_center=None, nozzle_size=0.4,
+            nozzle_temp=230, bed_temp=_UNSET, fan_speed=_UNSET,
+            nozzle_high_flow=False, nozzle_hardened=False,
+            printer="COREONE",
+        )
+        config = {
+            "nozzle_temp": 250,
+            "bed_temp": 100,
+        }
+        _apply_config(args, config, explicit_keys=frozenset({"nozzle_temp"}))
+        # CLI-supplied nozzle_temp wins
+        assert args.nozzle_temp == 230
+        # bed_temp was not explicit → TOML applies
+        assert args.bed_temp == 100
+
 
 # ---------------------------------------------------------------------------
 # _explicit_keys

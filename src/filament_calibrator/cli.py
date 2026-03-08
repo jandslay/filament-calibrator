@@ -210,6 +210,9 @@ _ARGPARSE_DEFAULTS: Dict[str, object] = {
     "nozzle_high_flow": False,
     "nozzle_hardened": False,
     "printer": "COREONE",
+    "nozzle_temp": _UNSET,
+    "bed_temp": _UNSET,
+    "fan_speed": _UNSET,
 }
 
 

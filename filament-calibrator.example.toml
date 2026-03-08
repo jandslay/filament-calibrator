@@ -28,3 +28,10 @@ printer = "coreone"
 # Defaults
 filament-type = "PLA"
 output-dir = "./output"
+
+# Temperature overrides — applied to all tools that accept these flags.
+# These override the filament-type preset defaults but are in turn
+# overridden by explicit CLI flags (--nozzle-temp, --bed-temp, --fan-speed).
+# nozzle-temp = 215
+# bed-temp = 60
+# fan-speed = 100

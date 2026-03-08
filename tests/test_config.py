@@ -64,6 +64,7 @@ class TestConstants:
             "config-ini", "filament-type", "output-dir",
             "bed-center", "nozzle-size", "nozzle-high-flow",
             "nozzle-hardened", "printer",
+            "nozzle-temp", "bed-temp", "fan-speed",
         }
         assert CONFIG_KEYS == expected
 
@@ -227,3 +228,26 @@ class TestLoadConfig:
         with pytest.warns(UserWarning, match="expected float"):
             result = load_config(str(cfg))
         assert result == {"printer_url": "http://10.0.0.1"}
+
+    def test_load_temperature_keys(self, tmp_path):
+        """nozzle-temp, bed-temp, fan-speed are loaded as integers."""
+        cfg = tmp_path / "config.toml"
+        cfg.write_text(
+            "nozzle-temp = 250\n"
+            "bed-temp = 100\n"
+            "fan-speed = 50\n"
+        )
+        result = load_config(str(cfg))
+        assert result == {
+            "nozzle_temp": 250,
+            "bed_temp": 100,
+            "fan_speed": 50,
+        }
+
+    def test_wrong_type_string_for_int_warns(self, tmp_path):
+        """String value for an int key emits a warning and is ignored."""
+        cfg = tmp_path / "config.toml"
+        cfg.write_text('nozzle-temp = "hot"\n')
+        with pytest.warns(UserWarning, match="expected int"):
+            result = load_config(str(cfg))
+        assert result == {}
