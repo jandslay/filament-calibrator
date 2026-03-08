@@ -129,9 +129,26 @@ filament-calibrator-gui
 
 You need to `conda activate filcal` each time before using the tools.
 
-> **Note:** PrusaSlicer is also required on your PATH. ARM64 `.AppImage`
-> builds are available from
-> [prusa3d.com](https://www.prusa3d.com/page/prusaslicer_424/).
+**4. Install PrusaSlicer:**
+
+PrusaSlicer is required for slicing. On Raspberry Pi OS, install it via
+[Flatpak](https://flatpak.org/):
+
+```bash
+sudo apt install flatpak
+flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+flatpak install flathub com.prusa3d.PrusaSlicer
+```
+
+Then add it to your PATH so filament-calibrator can find it:
+
+```bash
+echo 'alias prusaslicer="flatpak run com.prusa3d.PrusaSlicer"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+Or use `--prusaslicer-path "flatpak run com.prusa3d.PrusaSlicer"` when
+running the CLI tools.
 
 ## Conda alternative
 
