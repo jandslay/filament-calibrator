@@ -19,6 +19,7 @@ from filament_calibrator.cli import (
     _explicit_keys,
     _patch_m862_nozzle_flags,
     _resolve_output_dir,
+    _validate_printer_temps,
 )
 from filament_calibrator.config import _find_config_path, load_config
 from filament_calibrator.flow_insert import compute_flow_levels, insert_flow_rates
@@ -320,6 +321,8 @@ def run(args: argparse.Namespace) -> None:
         if args.bed_center is None:
             args.bed_center = gl.compute_bed_center(printer_name)
         bed_shape = gl.compute_bed_shape(printer_name)
+
+    _validate_printer_temps(printer_name, nozzle_temp, bed_temp)
 
     # Derive layer height and extrusion width from nozzle size.
     nozzle_size: float = args.nozzle_size

@@ -22,6 +22,7 @@ from filament_calibrator.cli import (
     _explicit_keys,
     _patch_m862_nozzle_flags,
     _resolve_output_dir,
+    _validate_printer_temps,
 )
 from filament_calibrator.config import load_config
 from filament_calibrator.retraction_insert import (
@@ -282,6 +283,8 @@ def _resolve_common(args: argparse.Namespace) -> dict:
         if args.bed_center is None:
             args.bed_center = gl.compute_bed_center(printer_name)
         bed_shape = gl.compute_bed_shape(printer_name)
+
+    _validate_printer_temps(printer_name, nozzle_temp, bed_temp)
 
     return {
         "num_levels": num_levels,

@@ -318,6 +318,31 @@ def _resolve_output_dir(
     return Path(tempfile.mkdtemp(prefix=prefix))
 
 
+def _validate_printer_temps(
+    printer_name: Optional[str],
+    nozzle_temp: int,
+    bed_temp: int,
+) -> None:
+    """Exit if temps exceed the selected printer's hardware limits."""
+    if printer_name is None:
+        return
+    specs = gl.PRINTER_PRESETS.get(printer_name)
+    if specs is None:
+        return
+    max_nozzle = specs.get("max_nozzle_temp")
+    max_bed = specs.get("max_bed_temp")
+    if max_nozzle is not None and nozzle_temp > max_nozzle:
+        sys.exit(
+            f"error: nozzle temp {nozzle_temp}°C exceeds {printer_name} "
+            f"max of {int(max_nozzle)}°C"
+        )
+    if max_bed is not None and bed_temp > max_bed:
+        sys.exit(
+            f"error: bed temp {bed_temp}°C exceeds {printer_name} "
+            f"max of {int(max_bed)}°C"
+        )
+
+
 def _resolve_preset(args: argparse.Namespace) -> Dict[str, object]:
     """Look up the filament preset and return resolved settings.
 
@@ -475,6 +500,8 @@ def run(args: argparse.Namespace) -> None:
         if args.bed_center is None:
             args.bed_center = gl.compute_bed_center(printer_name)
         bed_shape = gl.compute_bed_shape(printer_name)
+
+    _validate_printer_temps(printer_name, start_temp, bed_temp)
 
     # Derive layer height and extrusion width from nozzle size.
     nozzle_size: float = args.nozzle_size

@@ -18,6 +18,7 @@ from filament_calibrator.cli import (
     _compute_num_tiers,
     _explicit_keys,
     _patch_m862_nozzle_flags,
+    _validate_printer_temps,
     build_parser,
     main,
     _resolve_preset,
@@ -368,6 +369,58 @@ class TestPatchM862NozzleFlags:
     def test_empty_lines(self):
         result = _patch_m862_nozzle_flags([])
         assert result == []
+
+
+# ---------------------------------------------------------------------------
+# _validate_printer_temps
+# ---------------------------------------------------------------------------
+
+
+class TestValidatePrinterTemps:
+    def test_none_printer_is_noop(self):
+        _validate_printer_temps(None, 300, 120)  # should not raise
+
+    def test_unknown_printer_is_noop(self):
+        with patch.dict(gl.PRINTER_PRESETS, {}, clear=True):
+            _validate_printer_temps("UNKNOWN", 300, 120)
+
+    def test_nozzle_temp_within_limit(self):
+        with patch.dict(gl.PRINTER_PRESETS, {
+            "TEST": {"max_nozzle_temp": 290, "max_bed_temp": 120},
+        }, clear=True):
+            _validate_printer_temps("TEST", 290, 100)  # should not raise
+
+    def test_bed_temp_within_limit(self):
+        with patch.dict(gl.PRINTER_PRESETS, {
+            "TEST": {"max_nozzle_temp": 290, "max_bed_temp": 120},
+        }, clear=True):
+            _validate_printer_temps("TEST", 200, 120)  # should not raise
+
+    def test_nozzle_temp_exceeds_limit(self):
+        with patch.dict(gl.PRINTER_PRESETS, {
+            "TEST": {"max_nozzle_temp": 290, "max_bed_temp": 120},
+        }, clear=True):
+            with pytest.raises(SystemExit, match="nozzle temp 300.*exceeds TEST max of 290"):
+                _validate_printer_temps("TEST", 300, 100)
+
+    def test_bed_temp_exceeds_limit(self):
+        with patch.dict(gl.PRINTER_PRESETS, {
+            "TEST": {"max_nozzle_temp": 290, "max_bed_temp": 120},
+        }, clear=True):
+            with pytest.raises(SystemExit, match="bed temp 130.*exceeds TEST max of 120"):
+                _validate_printer_temps("TEST", 200, 130)
+
+    def test_missing_max_nozzle_key_is_noop(self):
+        with patch.dict(gl.PRINTER_PRESETS, {
+            "TEST": {"max_bed_temp": 120},
+        }, clear=True):
+            _validate_printer_temps("TEST", 999, 100)  # should not raise
+
+    def test_missing_max_bed_key_is_noop(self):
+        with patch.dict(gl.PRINTER_PRESETS, {
+            "TEST": {"max_nozzle_temp": 290},
+        }, clear=True):
+            _validate_printer_temps("TEST", 200, 999)  # should not raise
 
 
 # ---------------------------------------------------------------------------
@@ -1263,6 +1316,34 @@ class TestRun:
         args = self._make_args(tmp_path, printer="NOPE")
         with pytest.raises(SystemExit):
             run(args)
+
+    @patch("gcode_lib.compute_bed_shape", return_value="0x0,250x0,250x220,0x220")
+    @patch("gcode_lib.compute_bed_center", return_value="125,110")
+    @patch("gcode_lib.resolve_printer", return_value="TEST")
+    def test_nozzle_temp_exceeds_printer_limit(
+        self, mock_resolve, mock_center, mock_shape, tmp_path,
+    ):
+        with patch.dict(gl.PRINTER_PRESETS, {
+            "TEST": {"max_nozzle_temp": 290, "max_bed_temp": 120},
+        }):
+            args = self._make_args(
+                tmp_path, start_temp=300, end_temp=295, temp_step=5,
+            )
+            with pytest.raises(SystemExit, match="nozzle temp.*exceeds"):
+                run(args)
+
+    @patch("gcode_lib.compute_bed_shape", return_value="0x0,250x0,250x220,0x220")
+    @patch("gcode_lib.compute_bed_center", return_value="125,110")
+    @patch("gcode_lib.resolve_printer", return_value="TEST")
+    def test_bed_temp_exceeds_printer_limit(
+        self, mock_resolve, mock_center, mock_shape, tmp_path,
+    ):
+        with patch.dict(gl.PRINTER_PRESETS, {
+            "TEST": {"max_nozzle_temp": 290, "max_bed_temp": 120},
+        }):
+            args = self._make_args(tmp_path, bed_temp=130)
+            with pytest.raises(SystemExit, match="bed temp.*exceeds"):
+                run(args)
 
 
 # ---------------------------------------------------------------------------

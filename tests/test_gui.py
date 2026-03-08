@@ -6,10 +6,13 @@ import subprocess
 import sys
 from unittest.mock import MagicMock, patch
 
+import gcode_lib as gl
+
 from filament_calibrator.gui import (
     _FALLBACK_PRESET,
     _NOZZLE_SIZES,
     _PRINTER_LIST,
+    _check_printer_temps,
     _fresh_output_dir,
     _open_directory_dialog,
     _open_file_dialog,
@@ -1129,3 +1132,49 @@ class TestBuildRetractionNamespace:
         assert ns.prusaslicer_path is None
         assert ns.printer_url is None
         assert ns.api_key is None
+
+
+# ---------------------------------------------------------------------------
+# _check_printer_temps
+# ---------------------------------------------------------------------------
+
+
+class TestCheckPrinterTemps:
+    def test_returns_none_when_within_limits(self):
+        with patch.dict(gl.PRINTER_PRESETS, {
+            "COREONE": {"max_nozzle_temp": 290, "max_bed_temp": 120},
+        }):
+            assert _check_printer_temps("COREONE", 250, 60) is None
+
+    def test_nozzle_temp_exceeds(self):
+        with patch.dict(gl.PRINTER_PRESETS, {
+            "COREONE": {"max_nozzle_temp": 290, "max_bed_temp": 120},
+        }):
+            result = _check_printer_temps("COREONE", 300, 60)
+            assert result is not None
+            assert "300" in result
+            assert "290" in result
+
+    def test_bed_temp_exceeds(self):
+        with patch.dict(gl.PRINTER_PRESETS, {
+            "COREONE": {"max_nozzle_temp": 290, "max_bed_temp": 120},
+        }):
+            result = _check_printer_temps("COREONE", 200, 130)
+            assert result is not None
+            assert "130" in result
+            assert "120" in result
+
+    def test_unknown_printer_returns_none(self):
+        with patch("gcode_lib.resolve_printer", side_effect=ValueError("nope")):
+            assert _check_printer_temps("NOPE", 999, 999) is None
+
+    def test_missing_max_keys_returns_none(self):
+        with patch.dict(gl.PRINTER_PRESETS, {
+            "COREONE": {},
+        }):
+            assert _check_printer_temps("COREONE", 999, 999) is None
+
+    def test_printer_not_in_presets_returns_none(self):
+        with patch("gcode_lib.resolve_printer", return_value="NEWPRINTER"), \
+             patch.dict(gl.PRINTER_PRESETS, {}, clear=True):
+            assert _check_printer_temps("NEWPRINTER", 999, 999) is None
