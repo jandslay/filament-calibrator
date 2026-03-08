@@ -30,6 +30,9 @@ CONFIG_KEYS: frozenset[str] = frozenset({
     "nozzle-high-flow",
     "nozzle-hardened",
     "printer",
+    "nozzle-temp",
+    "bed-temp",
+    "fan-speed",
 })
 
 #: Expected types for each config key.  Used by :func:`load_config`
@@ -46,6 +49,9 @@ _EXPECTED_TYPES: Dict[str, type] = {
     "nozzle-high-flow": bool,
     "nozzle-hardened": bool,
     "printer": str,
+    "nozzle-temp": int,
+    "bed-temp": int,
+    "fan-speed": int,
 }
 
 #: Map TOML key names (hyphenated) to argparse attribute names (underscored).
