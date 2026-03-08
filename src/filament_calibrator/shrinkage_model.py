@@ -147,7 +147,7 @@ def _make_cross(config: ShrinkageCrossConfig) -> cq.Workplane:
     x_label = (
         cq.Workplane("XY")
         .workplane(offset=size)
-        .center(label_offset, 0)
+        .center(label_offset, half)
         .text("X", font, depth, combine=False, halign="center", valign="center")
     )
     cross = cross.union(x_label)
