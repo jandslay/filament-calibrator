@@ -644,6 +644,7 @@ def apply_ini_to_session(
         state["em_nozzle_temp"] = nt
         state["flow_nozzle_temp"] = nt
         state["pa_nozzle_temp"] = nt
+        state["retraction_nozzle_temp"] = nt
         # Derive a temp tower range centred on the INI temperature.
         state["tt_start_temp"] = nt + 15
         state["tt_end_temp"] = nt - 15
@@ -654,6 +655,7 @@ def apply_ini_to_session(
         state["em_bed_temp"] = bt
         state["flow_bed_temp"] = bt
         state["pa_bed_temp"] = bt
+        state["retraction_bed_temp"] = bt
 
     if "fan_speed" in ini_vals:
         fs = ini_vals["fan_speed"]
@@ -661,18 +663,21 @@ def apply_ini_to_session(
         state["em_fan"] = fs
         state["flow_fan"] = fs
         state["pa_fan"] = fs
+        state["retraction_fan"] = fs
 
     if "layer_height" in ini_vals:
         lh = ini_vals["layer_height"]
         state["em_lh"] = lh
         state["flow_lh"] = lh
         state["pa_lh"] = lh
+        state["retraction_lh"] = lh
 
     if "extrusion_width" in ini_vals:
         ew = ini_vals["extrusion_width"]
         state["em_ew"] = ew
         state["flow_ew"] = ew
         state["pa_ew"] = ew
+        state["retraction_ew"] = ew
 
     if sidebar and "nozzle_diameter" in ini_vals:
         snapped = snap_nozzle_size(ini_vals["nozzle_diameter"])
@@ -731,6 +736,8 @@ def build_calibration_results(
     pa_value: float,
     set_em: bool,
     extrusion_multiplier: float,
+    set_retraction: bool,
+    retraction_length: float,
     printer: str,
 ) -> CalibrationResults:
     """Build a :class:`CalibrationResults` from GUI widget values.
@@ -745,6 +752,7 @@ def build_calibration_results(
         max_volumetric_speed=max_volumetric_speed if set_flow else None,
         pa_value=pa_value if set_pa else None,
         extrusion_multiplier=extrusion_multiplier if set_em else None,
+        retraction_length=retraction_length if set_retraction else None,
         printer=printer,
     )
 
@@ -761,6 +769,7 @@ def _app() -> None:  # pragma: no cover
     from filament_calibrator.em_cli import run as em_run
     from filament_calibrator.flow_cli import run as flow_run
     from filament_calibrator.pa_cli import run as pa_run
+    from filament_calibrator.retraction_cli import run as retraction_run
 
     st.set_page_config(
         page_title="Filament Calibrator",
@@ -986,6 +995,11 @@ def _app() -> None:  # pragma: no cover
         "pa_fan": preset["fan"],
         "pa_lh": derived_lh,
         "pa_ew": derived_ew,
+        "retraction_nozzle_temp": preset["hotend"],
+        "retraction_bed_temp": preset["bed"],
+        "retraction_fan": preset["fan"],
+        "retraction_lh": derived_lh,
+        "retraction_ew": derived_ew,
     }
     for _wk, _wv in _widget_defaults.items():
         if _wk not in st.session_state or _defaults_changed:
@@ -998,9 +1012,9 @@ def _app() -> None:  # pragma: no cover
         apply_ini_to_session(st.session_state, _ini_vals, sidebar=False)
 
     # --- Tabs ---
-    tab_temp, tab_em, tab_flow, tab_pa, tab_results = st.tabs([
+    tab_temp, tab_em, tab_flow, tab_pa, tab_retraction, tab_results = st.tabs([
         "Temperature Tower", "Extrusion Multiplier", "Volumetric Flow",
-        "Pressure Advance", "Results",
+        "Pressure Advance", "Retraction Test", "Results",
     ])
 
     # === Tab 1: Temperature Tower ===
@@ -1600,7 +1614,154 @@ def _app() -> None:  # pragma: no cover
         if _run and _run["tab"] == "pa":
             _show_results(st, _run)
 
-    # === Tab 5: Calibration Results ===
+    # === Tab 5: Retraction Test ===
+    with tab_retraction:
+        st.subheader("Retraction Test")
+        st.caption(
+            "Generate two cylindrical towers spaced apart. Travel moves "
+            "between them trigger retraction. Retraction length changes "
+            "at each height level so you can inspect stringing."
+        )
+
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            start_retraction = st.number_input(
+                "Start Retraction (mm)",
+                value=0.0,
+                min_value=0.0,
+                step=0.1,
+                format="%.1f",
+            )
+        with col2:
+            end_retraction = st.number_input(
+                "End Retraction (mm)",
+                value=2.0,
+                min_value=0.0,
+                step=0.1,
+                format="%.1f",
+            )
+        with col3:
+            retraction_step_val = st.number_input(
+                "Step (mm)",
+                value=0.1,
+                min_value=0.01,
+                step=0.1,
+                format="%.2f",
+            )
+
+        col4, col5, col6 = st.columns(3)
+        with col4:
+            retraction_nozzle_temp = st.number_input(
+                "Nozzle Temp (\u00b0C)",
+                min_value=150,
+                max_value=350,
+                key="retraction_nozzle_temp",
+            )
+        with col5:
+            retraction_bed_temp = st.number_input(
+                "Bed Temp (\u00b0C)",
+                min_value=0,
+                max_value=150,
+                key="retraction_bed_temp",
+            )
+        with col6:
+            retraction_fan = st.number_input(
+                "Fan Speed (%)",
+                min_value=0,
+                max_value=100,
+                key="retraction_fan",
+            )
+
+        retraction_level_height = 1.0
+        with st.expander("Advanced Slicer Settings"):
+            retraction_level_height = st.number_input(
+                "Level Height (mm)",
+                value=1.0,
+                min_value=0.2,
+                step=0.5,
+                key="retraction_level_height",
+            )
+            retraction_layer_height = st.number_input(
+                "Layer Height (mm)",
+                min_value=0.05,
+                max_value=1.0,
+                format="%.2f",
+                key="retraction_lh",
+            )
+            retraction_extrusion_width = st.number_input(
+                "Extrusion Width (mm)",
+                min_value=0.1,
+                max_value=2.0,
+                format="%.2f",
+                key="retraction_ew",
+            )
+
+        # Level count preview
+        if end_retraction > start_retraction and retraction_step_val > 0:
+            num_levels = (
+                round((end_retraction - start_retraction) / retraction_step_val)
+                + 1
+            )
+            st.info(
+                f"{num_levels} levels: "
+                f"{start_retraction:.1f} \u2192 {end_retraction:.1f} mm"
+            )
+
+        if st.button("Generate Retraction Test", type="primary",
+                      key="run_retraction"):
+            _temp_err = _check_printer_temps(
+                printer, retraction_nozzle_temp, retraction_bed_temp,
+            )
+            if _temp_err:
+                st.error(_temp_err)
+                st.stop()
+            run_dir = _fresh_output_dir(custom_output_dir)
+            args = build_retraction_namespace(
+                filament_type=filament_type,
+                start_retraction=start_retraction,
+                end_retraction=end_retraction,
+                retraction_step=retraction_step_val,
+                level_height=retraction_level_height,
+                nozzle_temp=retraction_nozzle_temp,
+                bed_temp=retraction_bed_temp,
+                fan_speed=retraction_fan,
+                nozzle_size=nozzle_size,
+                nozzle_high_flow=nozzle_high_flow,
+                nozzle_hardened=nozzle_hardened,
+                layer_height=retraction_layer_height,
+                extrusion_width=retraction_extrusion_width,
+                printer=printer,
+                ascii_gcode=ascii_gcode,
+                output_dir=run_dir,
+                config_ini=config_ini,
+                prusaslicer_path=prusaslicer_path,
+                printer_url=None,
+                api_key=None,
+                no_upload=True,
+                print_after_upload=False,
+            )
+            with st.spinner("Running retraction test pipeline..."):
+                success, log = run_pipeline(retraction_run, args)
+            st.session_state["_last_run"] = {
+                "output_dir": run_dir,
+                "ascii_gcode": ascii_gcode,
+                "success": success,
+                "log": log,
+                "tab": "retraction",
+                "upload_enabled": enable_upload,
+                "printer_url": printer_url,
+                "api_key": api_key,
+            }
+            st.session_state.pop("_upload_status", None)
+            st.session_state.pop("_upload_message", None)
+            st.session_state.pop("_print_after", None)
+            st.session_state.pop("upload_print_after", None)
+
+        _run = st.session_state.get("_last_run")
+        if _run and _run["tab"] == "retraction":
+            _show_results(st, _run)
+
+    # === Tab 6: Calibration Results ===
     with tab_results:
         st.subheader("Calibration Results")
         st.markdown(
@@ -1646,12 +1807,24 @@ def _app() -> None:  # pragma: no cover
             disabled=not set_em, key="res_em",
         )
 
+        # Retraction length result
+        set_retraction = st.checkbox(
+            "Set retraction length", key="res_set_retraction",
+        )
+        res_retraction = st.number_input(
+            "Retraction length (mm)", 0.0, 10.0, 0.8,
+            step=0.1, format="%.1f",
+            disabled=not set_retraction, key="res_retraction",
+        )
+
         # Build results object
         results = build_calibration_results(
             set_temp=set_temp, temperature=int(res_temp),
             set_flow=set_flow, max_volumetric_speed=float(res_flow),
             set_pa=set_pa, pa_value=float(res_pa),
             set_em=set_em, extrusion_multiplier=float(res_em),
+            set_retraction=set_retraction,
+            retraction_length=float(res_retraction),
             printer=printer,
         )
 
@@ -1661,6 +1834,7 @@ def _app() -> None:  # pragma: no cover
             or results.max_volumetric_speed is not None
             or results.pa_value is not None
             or results.extrusion_multiplier is not None
+            or results.retraction_length is not None
         )
         if has_any:
             summary = build_change_summary(results)

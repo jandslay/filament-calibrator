@@ -106,6 +106,18 @@ class TestMergeResultsIntoIni:
         merged = merge_results_into_ini(ini, results)
         assert "extrusion_multiplier = 1.02" in merged
 
+    def test_only_retraction(self) -> None:
+        ini = "retract_length = 1.0\n"
+        results = CalibrationResults(retraction_length=0.6)
+        merged = merge_results_into_ini(ini, results)
+        assert "retract_length = 0.6" in merged
+
+    def test_retraction_appended_when_missing(self) -> None:
+        ini = "temperature = 200\n"
+        results = CalibrationResults(retraction_length=0.8)
+        merged = merge_results_into_ini(ini, results)
+        assert "retract_length = 0.8" in merged
+
     def test_empty_input(self) -> None:
         results = CalibrationResults()
         merged = merge_results_into_ini("", results)
@@ -162,4 +174,11 @@ class TestBuildChangeSummary:
         summary = build_change_summary(results)
         assert "0.97" in summary
         assert "extrusion_multiplier" in summary
+        assert "temperature" not in summary.lower()
+
+    def test_partial_retraction_only(self) -> None:
+        results = CalibrationResults(retraction_length=0.6)
+        summary = build_change_summary(results)
+        assert "0.6 mm" in summary
+        assert "retract_length" in summary
         assert "temperature" not in summary.lower()
