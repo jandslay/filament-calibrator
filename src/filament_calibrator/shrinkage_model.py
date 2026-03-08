@@ -112,20 +112,22 @@ def _make_cross(config: ShrinkageCrossConfig) -> cq.Workplane:
         )
 
     for pos in _window_positions(length, interval, centre_lo, centre_hi):
-        # Y arm windows: cut through X-axis (hole in XZ plane)
+        # Y arm windows: cut through X-axis at the Y arm's X position.
+        # YZ workplane local coords: (globalY, globalZ, globalX).
         y_offset = -(length / 2.0 - half) + pos
         cross = cross.cut(
             cq.Workplane("YZ")
-            .transformed(offset=(0, y_offset, half))
+            .transformed(offset=(y_offset, half, length / 2.0 - half))
             .rect(win, win)
             .extrude(size)
         )
 
     for pos in _window_positions(length, interval, centre_lo, centre_hi):
-        # Z arm windows: cut through Y-axis (hole in XY plane)
+        # Z arm windows: cut through Y-axis (hole in XZ plane).
+        # XZ workplane local coords: (globalX, -globalZ, globalY).
         cross = cross.cut(
-            cq.Workplane("XY")
-            .transformed(offset=(length / 2.0, 0, pos))
+            cq.Workplane("XZ")
+            .transformed(offset=(length / 2.0, -pos, 0))
             .rect(win, win)
             .extrude(size)
         )
