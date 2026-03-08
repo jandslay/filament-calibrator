@@ -111,11 +111,13 @@ source ~/.bashrc
 ```bash
 conda create -n filcal python=3.12 cadquery -c conda-forge
 conda activate filcal
+pip install "ezdxf>=1.0,<1.4"
 pip install "filament-calibrator[gui]"
 ```
 
-Since CadQuery and OCP are already installed by conda, pip will skip those
-dependencies and install the rest (gcode-lib, streamlit, etc.).
+The `ezdxf` upgrade is needed because conda-forge installs a version that is
+too old for CadQuery's DXF exporter. After that, pip installs
+filament-calibrator and its remaining dependencies (gcode-lib, streamlit, etc.).
 
 **3. Run:**
 
