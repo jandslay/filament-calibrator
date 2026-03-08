@@ -103,10 +103,13 @@ def _make_cross(config: ShrinkageCrossConfig) -> cq.Workplane:
     interval = WINDOW_INTERVAL
 
     for pos in _window_positions(length, interval, centre_lo, centre_hi):
-        # X arm windows: cut through Y-axis (hole in YZ plane)
+        # X arm windows: cut through the arm in the Y direction.
+        # XZ workplane: offset=(a,b,c) → global (a, -c, b), extrude → -Y.
+        # Arm occupies Y=[0,size], Z=[0,size].  Place rect at Z-centre
+        # (b=half) and start at Y=size (c=-size) so extrude(size) reaches Y=0.
         cross = cross.cut(
             cq.Workplane("XZ")
-            .transformed(offset=(pos, 0, half))
+            .transformed(offset=(pos, half, -size))
             .rect(win, win)
             .extrude(size)
         )
@@ -123,11 +126,14 @@ def _make_cross(config: ShrinkageCrossConfig) -> cq.Workplane:
         )
 
     for pos in _window_positions(length, interval, centre_lo, centre_hi):
-        # Z arm windows: cut through Y-axis (hole in XZ plane).
-        # XZ workplane local coords: (globalX, -globalZ, globalY).
+        # Z arm windows: cut through the arm in the Y direction.
+        # XZ workplane: offset=(a,b,c) → global (a, -c, b), extrude → -Y.
+        # Arm occupies X=[length/2-half, length/2+half], Y=[0,size], Z=[0,length].
+        # Place rect at X-centre (a=length/2), Z=pos (b=pos), start at
+        # Y=size (c=-size) so extrude(size) reaches Y=0.
         cross = cross.cut(
             cq.Workplane("XZ")
-            .transformed(offset=(length / 2.0, -pos, 0))
+            .transformed(offset=(length / 2.0, pos, -size))
             .rect(win, win)
             .extrude(size)
         )
