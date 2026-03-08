@@ -86,6 +86,35 @@ def run_pipeline(
     return success, buf.getvalue()
 
 
+def _check_printer_temps(
+    printer: str,
+    nozzle_temp: int,
+    bed_temp: int,
+) -> Optional[str]:
+    """Return an error message if temps exceed the printer's limits, else None."""
+    printer_name: Optional[str]
+    try:
+        printer_name = gl.resolve_printer(printer)
+    except ValueError:
+        return None
+    specs = gl.PRINTER_PRESETS.get(printer_name)
+    if specs is None:
+        return None
+    max_nozzle = specs.get("max_nozzle_temp")
+    max_bed = specs.get("max_bed_temp")
+    if max_nozzle is not None and nozzle_temp > max_nozzle:
+        return (
+            f"Nozzle temp {nozzle_temp}°C exceeds {printer_name} "
+            f"max of {int(max_nozzle)}°C"
+        )
+    if max_bed is not None and bed_temp > max_bed:
+        return (
+            f"Bed temp {bed_temp}°C exceeds {printer_name} "
+            f"max of {int(max_bed)}°C"
+        )
+    return None
+
+
 def build_temp_tower_namespace(
     *,
     filament_type: str,
@@ -761,6 +790,7 @@ def _app() -> None:  # pragma: no cover
     _ini_vals: Dict[str, Any] = {}
     _cur_ini = st.session_state.get("config_ini", "")
     _prev_ini = st.session_state.get("_prev_config_ini", "")
+    _ini_cleared = bool(_prev_ini and not _cur_ini)
     if _cur_ini != _prev_ini:
         st.session_state["_prev_config_ini"] = _cur_ini
         if _cur_ini and Path(_cur_ini).is_file():
@@ -929,7 +959,9 @@ def _app() -> None:  # pragma: no cover
     # explicit values are re-applied afterwards so they always win.
     _prev_ft = st.session_state.get("_preset_filament_type")
     _prev_ns = st.session_state.get("_preset_nozzle_size")
-    _defaults_changed = _prev_ft != filament_type or _prev_ns != nozzle_size
+    _defaults_changed = (
+        _prev_ft != filament_type or _prev_ns != nozzle_size or _ini_cleared
+    )
     if _defaults_changed:
         st.session_state["_preset_filament_type"] = filament_type
         st.session_state["_preset_nozzle_size"] = nozzle_size
@@ -1037,6 +1069,10 @@ def _app() -> None:  # pragma: no cover
 
         if st.button("Generate Temperature Tower", type="primary",
                       key="run_temp"):
+            _temp_err = _check_printer_temps(printer, start_temp, tt_bed_temp)
+            if _temp_err:
+                st.error(_temp_err)
+                st.stop()
             run_dir = _fresh_output_dir(custom_output_dir)
             args = build_temp_tower_namespace(
                 filament_type=filament_type,
@@ -1141,6 +1177,12 @@ def _app() -> None:  # pragma: no cover
 
         if st.button("Generate EM Cube", type="primary",
                       key="run_em"):
+            _temp_err = _check_printer_temps(
+                printer, em_nozzle_temp, em_bed_temp,
+            )
+            if _temp_err:
+                st.error(_temp_err)
+                st.stop()
             run_dir = _fresh_output_dir(custom_output_dir)
             args = build_em_namespace(
                 filament_type=filament_type,
@@ -1274,6 +1316,12 @@ def _app() -> None:  # pragma: no cover
 
         if st.button("Generate Flow Specimen", type="primary",
                       key="run_flow"):
+            _temp_err = _check_printer_temps(
+                printer, flow_nozzle_temp, flow_bed_temp,
+            )
+            if _temp_err:
+                st.error(_temp_err)
+                st.stop()
             run_dir = _fresh_output_dir(custom_output_dir)
             args = build_flow_namespace(
                 filament_type=filament_type,
@@ -1492,6 +1540,12 @@ def _app() -> None:  # pragma: no cover
 
         if st.button("Generate PA Calibration", type="primary",
                       key="run_pa"):
+            _temp_err = _check_printer_temps(
+                printer, pa_nozzle_temp, pa_bed_temp,
+            )
+            if _temp_err:
+                st.error(_temp_err)
+                st.stop()
             run_dir = _fresh_output_dir(custom_output_dir)
             args = build_pa_namespace(
                 filament_type=filament_type,

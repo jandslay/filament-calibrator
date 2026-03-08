@@ -1134,6 +1134,32 @@ class TestRun:
         with pytest.raises(SystemExit):
             run(args)
 
+    @patch("gcode_lib.compute_bed_shape", return_value="0x0,250x0,250x220,0x220")
+    @patch("gcode_lib.compute_bed_center", return_value="125,110")
+    @patch("gcode_lib.resolve_printer", return_value="TEST")
+    def test_nozzle_temp_exceeds_printer_limit(
+        self, mock_resolve, mock_center, mock_shape, tmp_path,
+    ):
+        with patch.dict(gl.PRINTER_PRESETS, {
+            "TEST": {"max_nozzle_temp": 290, "max_bed_temp": 120},
+        }):
+            args = self._make_args(tmp_path, nozzle_temp=300)
+            with pytest.raises(SystemExit, match="nozzle temp.*exceeds"):
+                run(args)
+
+    @patch("gcode_lib.compute_bed_shape", return_value="0x0,250x0,250x220,0x220")
+    @patch("gcode_lib.compute_bed_center", return_value="125,110")
+    @patch("gcode_lib.resolve_printer", return_value="TEST")
+    def test_bed_temp_exceeds_printer_limit(
+        self, mock_resolve, mock_center, mock_shape, tmp_path,
+    ):
+        with patch.dict(gl.PRINTER_PRESETS, {
+            "TEST": {"max_nozzle_temp": 290, "max_bed_temp": 120},
+        }):
+            args = self._make_args(tmp_path, bed_temp=130)
+            with pytest.raises(SystemExit, match="bed temp.*exceeds"):
+                run(args)
+
 
 # ---------------------------------------------------------------------------
 # Pattern pipeline
