@@ -140,15 +140,12 @@ flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flat
 flatpak install flathub com.prusa3d.PrusaSlicer
 ```
 
-Then add it to your PATH so filament-calibrator can find it:
+Then create a symlink so filament-calibrator can find it (shell aliases
+don't work with subprocess calls):
 
 ```bash
-echo 'alias prusaslicer="flatpak run com.prusa3d.PrusaSlicer"' >> ~/.bashrc
-source ~/.bashrc
+sudo ln -s /var/lib/flatpak/exports/bin/com.prusa3d.PrusaSlicer /usr/local/bin/prusaslicer
 ```
-
-Or use `--prusaslicer-path "flatpak run com.prusa3d.PrusaSlicer"` when
-running the CLI tools.
 
 ## Conda alternative
 
