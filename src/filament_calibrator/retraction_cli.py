@@ -21,6 +21,7 @@ from filament_calibrator.cli import (
     _apply_config,
     _explicit_keys,
     _patch_m862_nozzle_flags,
+    _redact_config_for_debug,
     _resolve_output_dir,
     _validate_printer_temps,
 )
@@ -51,6 +52,7 @@ MAX_LEVELS: int = 50
 
 _FIND_CONFIG_PATHS = (
     Path("filament-calibrator.toml"),
+    Path.home() / "filament-calibrator.toml",
     Path.home() / ".config" / "filament-calibrator" / "config.toml",
 )
 
@@ -143,8 +145,9 @@ def build_parser() -> argparse.ArgumentParser:
     slicer.add_argument("--prusaslicer-path", type=str, default=None)
     slicer.add_argument("--bed-center", type=str, default=None)
     slicer.add_argument(
-        "--extra-slicer-args", nargs="*", default=None,
-        help="Additional PrusaSlicer CLI arguments.",
+        "--extra-slicer-args", type=str,
+        nargs=argparse.REMAINDER, default=None,
+        help="Additional PrusaSlicer CLI arguments (must be last).",
     )
 
     # -- Printer model --
@@ -348,7 +351,7 @@ def _debug_common(
     cfg_path = _find_config_path(args.config)
     if cfg_path is not None:
         print(f"[DEBUG] Config file: {cfg_path}")
-        print(f"[DEBUG] Config values: {toml_config}")
+        print(f"[DEBUG] Config values: {_redact_config_for_debug(toml_config)}")
     else:
         print("[DEBUG] No config file loaded")
 

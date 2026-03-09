@@ -23,6 +23,7 @@ from filament_calibrator.cli import (
     _apply_config,
     _explicit_keys,
     _patch_m862_nozzle_flags,
+    _redact_config_for_debug,
     _resolve_output_dir,
     _validate_printer_temps,
 )
@@ -796,7 +797,7 @@ def _debug_common(
     cfg_path = _find_config_path(args.config)
     if cfg_path is not None:
         print(f"[DEBUG] Config file: {cfg_path}")
-        print(f"[DEBUG] Config values: {toml_config}")
+        print(f"[DEBUG] Config values: {_redact_config_for_debug(toml_config)}")
     else:
         print("[DEBUG] No config file loaded")
 

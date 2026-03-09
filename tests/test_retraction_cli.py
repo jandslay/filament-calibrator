@@ -105,6 +105,16 @@ class TestBuildParser:
         help_text = p.format_help()
         assert "PLA" in help_text
 
+    def test_extra_slicer_args_allows_option_values(self):
+        p = build_parser()
+        args = p.parse_args([
+            "--extra-slicer-args",
+            "--foo=1",
+            "--bar",
+            "2",
+        ])
+        assert args.extra_slicer_args == ["--foo=1", "--bar", "2"]
+
 
 # ---------------------------------------------------------------------------
 # _validate_retraction_args

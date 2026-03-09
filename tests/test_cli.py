@@ -18,6 +18,7 @@ from filament_calibrator.cli import (
     _compute_num_tiers,
     _explicit_keys,
     _patch_m862_nozzle_flags,
+    _redact_config_for_debug,
     _validate_printer_temps,
     build_parser,
     main,
@@ -291,6 +292,21 @@ class TestApplyConfig:
         assert args.nozzle_temp == 230
         # bed_temp was not explicit → TOML applies
         assert args.bed_temp == 100
+
+
+class TestRedactConfigForDebug:
+    def test_masks_api_key(self):
+        redacted = _redact_config_for_debug(
+            {"printer_url": "http://10.0.0.1", "api_key": "secret"},
+        )
+        assert redacted["printer_url"] == "http://10.0.0.1"
+        assert redacted["api_key"] == "***REDACTED***"
+
+    def test_returns_copy(self):
+        cfg = {"filament_type": "PLA"}
+        redacted = _redact_config_for_debug(cfg)
+        assert redacted == cfg
+        assert redacted is not cfg
 
 
 # ---------------------------------------------------------------------------
@@ -1165,7 +1181,7 @@ class TestRun:
         mock_inject, mock_patch_meta, tmp_path, capsys
     ):
         cfg = tmp_path / "test.toml"
-        cfg.write_text('filament-type = "PLA"\n')
+        cfg.write_text('filament-type = "PLA"\napi-key = "super-secret"\n')
 
         mock_gen.return_value = str(tmp_path / "tower.stl")
         mock_slice.return_value = MagicMock(
@@ -1182,6 +1198,8 @@ class TestRun:
         assert "Config file:" in captured.out
         assert str(cfg) in captured.out
         assert "Config values:" in captured.out
+        assert "***REDACTED***" in captured.out
+        assert "super-secret" not in captured.out
 
     @patch("gcode_lib.patch_slicer_metadata")
     @patch("gcode_lib.inject_thumbnails")

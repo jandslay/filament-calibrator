@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 
 import gcode_lib as gl
 
+from filament_calibrator.cli import _apply_config
 from filament_calibrator.gui import (
     _FALLBACK_PRESET,
     _NOZZLE_SIZES,
@@ -112,6 +113,7 @@ class TestRunPipeline:
 
         success, output = run_pipeline(_exit_msg, argparse.Namespace())
         assert success is False
+        assert "fatal error message" in output
 
     def test_unexpected_exception(self) -> None:
         def _raise(_: argparse.Namespace) -> None:
@@ -191,6 +193,36 @@ class TestBuildTempTowerNamespace:
         assert ns.prusaslicer_path is None
         assert ns.printer_url is None
         assert ns.api_key is None
+
+    def test_sets_explicit_keys_to_block_toml_override(self) -> None:
+        ns = build_temp_tower_namespace(
+            filament_type="PLA",
+            start_temp=230,
+            end_temp=190,
+            temp_step=5,
+            bed_temp=60,
+            fan_speed=100,
+            brand_top="",
+            brand_bottom="",
+            nozzle_size=0.4,
+            printer="COREONE",
+            ascii_gcode=False,
+            output_dir="/tmp/test",
+            config_ini=None,
+            prusaslicer_path=None,
+            printer_url=None,
+            api_key=None,
+            no_upload=True,
+            print_after_upload=False,
+        )
+        assert "filament_type" in ns._explicit_keys
+        assert "printer" in ns._explicit_keys
+        _apply_config(
+            ns, {"filament_type": "ABS", "printer": "MINI"},
+            explicit_keys=ns._explicit_keys,
+        )
+        assert ns.filament_type == "PLA"
+        assert ns.printer == "COREONE"
 
 
 class TestBuildFlowNamespace:

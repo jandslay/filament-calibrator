@@ -216,6 +216,14 @@ _ARGPARSE_DEFAULTS: Dict[str, object] = {
 }
 
 
+def _redact_config_for_debug(config: Dict[str, object]) -> Dict[str, object]:
+    """Return a copy of *config* with sensitive values masked."""
+    redacted = dict(config)
+    if "api_key" in redacted and redacted["api_key"] not in (None, ""):
+        redacted["api_key"] = "***REDACTED***"
+    return redacted
+
+
 def _apply_config(
     args: argparse.Namespace,
     config: Dict[str, object],
@@ -459,7 +467,7 @@ def run(args: argparse.Namespace) -> None:
         cfg_path = _find_config_path(args.config)
         if cfg_path is not None:
             print(f"[DEBUG] Config file: {cfg_path}")
-            print(f"[DEBUG] Config values: {toml_config}")
+            print(f"[DEBUG] Config values: {_redact_config_for_debug(toml_config)}")
         else:
             print("[DEBUG] No config file loaded")
 

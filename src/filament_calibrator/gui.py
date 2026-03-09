@@ -20,7 +20,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import gcode_lib as gl
 
-from filament_calibrator.cli import _KNOWN_TYPES
+from filament_calibrator.cli import _ARGPARSE_DEFAULTS, _KNOWN_TYPES
 from filament_calibrator.config import load_config
 from filament_calibrator.ini_writer import (
     CalibrationResults,
@@ -45,6 +45,7 @@ _FALLBACK_PRESET: Dict[str, Any] = {
 _NOZZLE_SIZES: List[float] = [0.25, 0.3, 0.4, 0.5, 0.6, 0.8]
 
 _PRINTER_LIST: List[str] = sorted(gl.KNOWN_PRINTERS)
+_GUI_EXPLICIT_KEYS = frozenset(_ARGPARSE_DEFAULTS.keys())
 
 
 def get_preset(filament_type: str) -> Dict[str, Any]:
@@ -80,6 +81,8 @@ def run_pipeline(
             run_fn(args)
     except SystemExit as exc:
         success = exc.code in (0, None)
+        if not success and isinstance(exc.code, str):
+            buf.write(f"{exc.code}\n")
     except Exception as exc:
         buf.write(f"\nUnexpected error: {exc}\n")
         success = False
@@ -162,6 +165,7 @@ def build_temp_tower_namespace(
         api_key=api_key or None,
         no_upload=no_upload,
         print_after_upload=print_after_upload,
+        _explicit_keys=_GUI_EXPLICIT_KEYS,
         config=None,
         keep_files=True,
         verbose=True,
@@ -219,6 +223,7 @@ def build_flow_namespace(
         api_key=api_key or None,
         no_upload=no_upload,
         print_after_upload=print_after_upload,
+        _explicit_keys=_GUI_EXPLICIT_KEYS,
         config=None,
         keep_files=True,
         verbose=True,
@@ -292,6 +297,7 @@ def build_pa_namespace(
         api_key=api_key or None,
         no_upload=no_upload,
         print_after_upload=print_after_upload,
+        _explicit_keys=_GUI_EXPLICIT_KEYS,
         config=None,
         keep_files=True,
         verbose=True,
@@ -343,6 +349,7 @@ def build_em_namespace(
         api_key=api_key or None,
         no_upload=no_upload,
         print_after_upload=print_after_upload,
+        _explicit_keys=_GUI_EXPLICIT_KEYS,
         config=None,
         keep_files=True,
         verbose=True,
@@ -400,6 +407,7 @@ def build_retraction_namespace(
         api_key=api_key or None,
         no_upload=no_upload,
         print_after_upload=print_after_upload,
+        _explicit_keys=_GUI_EXPLICIT_KEYS,
         config=None,
         keep_files=True,
         verbose=True,
@@ -451,6 +459,7 @@ def build_shrinkage_namespace(
         api_key=api_key or None,
         no_upload=no_upload,
         print_after_upload=print_after_upload,
+        _explicit_keys=_GUI_EXPLICIT_KEYS,
         config=None,
         keep_files=True,
         verbose=True,
