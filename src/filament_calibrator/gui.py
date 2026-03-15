@@ -2035,19 +2035,21 @@ def _app() -> None:  # pragma: no cover
         elif spread <= 0:
             st.warning("Start temp must be higher than end temp.")
 
-        with st.expander("Advanced Slicer Settings",
-                          key="tt_advanced"):
+        tt_enable_brim = st.checkbox("Enable Brim", key="tt_enable_brim")
+        _bc1, _bc2 = st.columns(2)
+        with _bc1:
             tt_brim_width = st.number_input(
                 "Brim Width (mm)",
-                value=0.0, min_value=0.0, max_value=20.0,
+                value=5.0, min_value=0.0, max_value=20.0,
                 step=1.0, format="%.1f", key="tt_brim_width",
-                help="0 = use slicer default",
+                disabled=not tt_enable_brim,
             )
+        with _bc2:
             tt_brim_sep = st.number_input(
                 "Brim Separation (mm)",
-                value=0.0, min_value=0.0, max_value=2.0,
+                value=0.10, min_value=0.0, max_value=2.0,
                 step=0.05, format="%.2f", key="tt_brim_sep",
-                help="0 = use slicer default",
+                disabled=not tt_enable_brim,
             )
 
         if st.button("Generate Temperature Tower", type="primary",
@@ -2078,8 +2080,8 @@ def _app() -> None:  # pragma: no cover
                 api_key=None,
                 no_upload=True,
                 print_after_upload=False,
-                brim_width=tt_brim_width or None,
-                brim_separation=tt_brim_sep or None,
+                brim_width=tt_brim_width if tt_enable_brim else None,
+                brim_separation=tt_brim_sep if tt_enable_brim else None,
             )
             with st.spinner("Running temperature tower pipeline..."):
                 success, log, estimate = run_pipeline(temp_run, args)
@@ -2135,6 +2137,23 @@ def _app() -> None:  # pragma: no cover
                 key="em_fan",
             )
 
+        em_enable_brim = st.checkbox("Enable Brim", key="em_enable_brim")
+        _bc1, _bc2 = st.columns(2)
+        with _bc1:
+            em_brim_width = st.number_input(
+                "Brim Width (mm)",
+                value=5.0, min_value=0.0, max_value=20.0,
+                step=1.0, format="%.1f", key="em_brim_width",
+                disabled=not em_enable_brim,
+            )
+        with _bc2:
+            em_brim_sep = st.number_input(
+                "Brim Separation (mm)",
+                value=0.10, min_value=0.0, max_value=2.0,
+                step=0.05, format="%.2f", key="em_brim_sep",
+                disabled=not em_enable_brim,
+            )
+
         with st.expander("Advanced Slicer Settings"):
             em_cube_size = st.number_input(
                 "Cube Size (mm)",
@@ -2157,18 +2176,6 @@ def _app() -> None:  # pragma: no cover
                 max_value=2.0,
                 format="%.2f",
                 key="em_ew",
-            )
-            em_brim_width = st.number_input(
-                "Brim Width (mm)",
-                value=0.0, min_value=0.0, max_value=20.0,
-                step=1.0, format="%.1f", key="em_brim_width",
-                help="0 = default (5 mm for this vase-mode tool)",
-            )
-            em_brim_sep = st.number_input(
-                "Brim Separation (mm)",
-                value=0.0, min_value=0.0, max_value=2.0,
-                step=0.05, format="%.2f", key="em_brim_sep",
-                help="0 = default (0.1 mm for this vase-mode tool)",
             )
 
         st.info(f"Expected wall thickness: {em_extrusion_width:.2f} mm")
@@ -2202,8 +2209,8 @@ def _app() -> None:  # pragma: no cover
                 api_key=None,
                 no_upload=True,
                 print_after_upload=False,
-                brim_width=em_brim_width or None,
-                brim_separation=em_brim_sep or None,
+                brim_width=em_brim_width if em_enable_brim else None,
+                brim_separation=em_brim_sep if em_enable_brim else None,
             )
             with st.spinner("Running extrusion multiplier pipeline..."):
                 success, log, estimate = run_pipeline(em_run, args)
@@ -2292,6 +2299,25 @@ def _app() -> None:  # pragma: no cover
                     key="retraction_fan",
                 )
 
+            retraction_enable_brim = st.checkbox(
+                "Enable Brim", key="retraction_enable_brim",
+            )
+            _bc1, _bc2 = st.columns(2)
+            with _bc1:
+                retraction_brim_width = st.number_input(
+                    "Brim Width (mm)",
+                    value=5.0, min_value=0.0, max_value=20.0,
+                    step=1.0, format="%.1f", key="retraction_brim_width",
+                    disabled=not retraction_enable_brim,
+                )
+            with _bc2:
+                retraction_brim_sep = st.number_input(
+                    "Brim Separation (mm)",
+                    value=0.10, min_value=0.0, max_value=2.0,
+                    step=0.05, format="%.2f", key="retraction_brim_sep",
+                    disabled=not retraction_enable_brim,
+                )
+
             retraction_level_height = 1.0
             with st.expander("Advanced Slicer Settings"):
                 retraction_level_height = st.number_input(
@@ -2314,18 +2340,6 @@ def _app() -> None:  # pragma: no cover
                     max_value=2.0,
                     format="%.2f",
                     key="retraction_ew",
-                )
-                retraction_brim_width = st.number_input(
-                    "Brim Width (mm)",
-                    value=0.0, min_value=0.0, max_value=20.0,
-                    step=1.0, format="%.1f", key="retraction_brim_width",
-                    help="0 = use slicer default",
-                )
-                retraction_brim_sep = st.number_input(
-                    "Brim Separation (mm)",
-                    value=0.0, min_value=0.0, max_value=2.0,
-                    step=0.05, format="%.2f", key="retraction_brim_sep",
-                    help="0 = use slicer default",
                 )
 
             # Level count preview
@@ -2374,8 +2388,8 @@ def _app() -> None:  # pragma: no cover
                     api_key=None,
                     no_upload=True,
                     print_after_upload=False,
-                    brim_width=retraction_brim_width or None,
-                    brim_separation=retraction_brim_sep or None,
+                    brim_width=retraction_brim_width if retraction_enable_brim else None,
+                    brim_separation=retraction_brim_sep if retraction_enable_brim else None,
                 )
                 with st.spinner("Running retraction test pipeline..."):
                     success, log, estimate = run_pipeline(retraction_run, args)
@@ -2468,6 +2482,25 @@ def _app() -> None:  # pragma: no cover
                     key="rs_fan",
                 )
 
+            rs_enable_brim = st.checkbox(
+                "Enable Brim", key="rs_enable_brim",
+            )
+            _bc1, _bc2 = st.columns(2)
+            with _bc1:
+                rs_brim_width = st.number_input(
+                    "Brim Width (mm)",
+                    value=5.0, min_value=0.0, max_value=20.0,
+                    step=1.0, format="%.1f", key="rs_brim_width",
+                    disabled=not rs_enable_brim,
+                )
+            with _bc2:
+                rs_brim_sep = st.number_input(
+                    "Brim Separation (mm)",
+                    value=0.10, min_value=0.0, max_value=2.0,
+                    step=0.05, format="%.2f", key="rs_brim_sep",
+                    disabled=not rs_enable_brim,
+                )
+
             rs_level_height = 1.0
             with st.expander("Advanced Slicer Settings"):
                 rs_level_height = st.number_input(
@@ -2490,18 +2523,6 @@ def _app() -> None:  # pragma: no cover
                     max_value=2.0,
                     format="%.2f",
                     key="rs_ew",
-                )
-                rs_brim_width = st.number_input(
-                    "Brim Width (mm)",
-                    value=0.0, min_value=0.0, max_value=20.0,
-                    step=1.0, format="%.1f", key="rs_brim_width",
-                    help="0 = use slicer default",
-                )
-                rs_brim_sep = st.number_input(
-                    "Brim Separation (mm)",
-                    value=0.0, min_value=0.0, max_value=2.0,
-                    step=0.05, format="%.2f", key="rs_brim_sep",
-                    help="0 = use slicer default",
                 )
 
             # Level count preview
@@ -2550,8 +2571,8 @@ def _app() -> None:  # pragma: no cover
                     api_key=None,
                     no_upload=True,
                     print_after_upload=False,
-                    brim_width=rs_brim_width or None,
-                    brim_separation=rs_brim_sep or None,
+                    brim_width=rs_brim_width if rs_enable_brim else None,
+                    brim_separation=rs_brim_sep if rs_enable_brim else None,
                 )
                 with st.spinner(
                     "Running retraction speed test pipeline..."
@@ -2654,6 +2675,23 @@ def _app() -> None:  # pragma: no cover
                 key="pa_fan",
             )
 
+        pa_enable_brim = st.checkbox("Enable Brim", key="pa_enable_brim")
+        _bc1, _bc2 = st.columns(2)
+        with _bc1:
+            pa_brim_width = st.number_input(
+                "Brim Width (mm)",
+                value=5.0, min_value=0.0, max_value=20.0,
+                step=1.0, format="%.1f", key="pa_brim_width",
+                disabled=not pa_enable_brim,
+            )
+        with _bc2:
+            pa_brim_sep = st.number_input(
+                "Brim Separation (mm)",
+                value=0.10, min_value=0.0, max_value=2.0,
+                step=0.05, format="%.2f", key="pa_brim_sep",
+                disabled=not pa_enable_brim,
+            )
+
         # Pattern-specific settings (defaults used when method is tower)
         pa_corner_angle = 90.0
         pa_arm_length = 40.0
@@ -2739,18 +2777,6 @@ def _app() -> None:  # pragma: no cover
                 format="%.2f",
                 key="pa_ew",
             )
-            pa_brim_width = st.number_input(
-                "Brim Width (mm)",
-                value=0.0, min_value=0.0, max_value=20.0,
-                step=1.0, format="%.1f", key="pa_brim_width",
-                help="0 = use slicer default",
-            )
-            pa_brim_sep = st.number_input(
-                "Brim Separation (mm)",
-                value=0.0, min_value=0.0, max_value=2.0,
-                step=0.05, format="%.2f", key="pa_brim_sep",
-                help="0 = use slicer default",
-            )
 
         # Level count preview
         if end_pa > start_pa and pa_step_val > 0:
@@ -2801,8 +2827,8 @@ def _app() -> None:  # pragma: no cover
                 api_key=None,
                 no_upload=True,
                 print_after_upload=False,
-                brim_width=pa_brim_width or None,
-                brim_separation=pa_brim_sep or None,
+                brim_width=pa_brim_width if pa_enable_brim else None,
+                brim_separation=pa_brim_sep if pa_enable_brim else None,
             )
             with st.spinner("Running pressure advance pipeline..."):
                 success, log, estimate = run_pipeline(pa_run, args)
@@ -2883,6 +2909,23 @@ def _app() -> None:  # pragma: no cover
                 key="flow_fan",
             )
 
+        flow_enable_brim = st.checkbox("Enable Brim", key="flow_enable_brim")
+        _bc1, _bc2 = st.columns(2)
+        with _bc1:
+            flow_brim_width = st.number_input(
+                "Brim Width (mm)",
+                value=5.0, min_value=0.0, max_value=20.0,
+                step=1.0, format="%.1f", key="flow_brim_width",
+                disabled=not flow_enable_brim,
+            )
+        with _bc2:
+            flow_brim_sep = st.number_input(
+                "Brim Separation (mm)",
+                value=0.10, min_value=0.0, max_value=2.0,
+                step=0.05, format="%.2f", key="flow_brim_sep",
+                disabled=not flow_enable_brim,
+            )
+
         with st.expander("Advanced Slicer Settings"):
             flow_level_height = st.number_input(
                 "Level Height (mm)",
@@ -2904,18 +2947,6 @@ def _app() -> None:  # pragma: no cover
                 max_value=2.0,
                 format="%.2f",
                 key="flow_ew",
-            )
-            flow_brim_width = st.number_input(
-                "Brim Width (mm)",
-                value=0.0, min_value=0.0, max_value=20.0,
-                step=1.0, format="%.1f", key="flow_brim_width",
-                help="0 = default (5 mm for this vase-mode tool)",
-            )
-            flow_brim_sep = st.number_input(
-                "Brim Separation (mm)",
-                value=0.0, min_value=0.0, max_value=2.0,
-                step=0.05, format="%.2f", key="flow_brim_sep",
-                help="0 = default (0.1 mm for this vase-mode tool)",
             )
 
         # Level count preview
@@ -2958,8 +2989,8 @@ def _app() -> None:  # pragma: no cover
                 api_key=None,
                 no_upload=True,
                 print_after_upload=False,
-                brim_width=flow_brim_width or None,
-                brim_separation=flow_brim_sep or None,
+                brim_width=flow_brim_width if flow_enable_brim else None,
+                brim_separation=flow_brim_sep if flow_enable_brim else None,
             )
             with st.spinner("Running volumetric flow pipeline..."):
                 success, log, estimate = run_pipeline(flow_run, args)
@@ -3015,6 +3046,25 @@ def _app() -> None:  # pragma: no cover
                 key="shrinkage_fan",
             )
 
+        shrinkage_enable_brim = st.checkbox(
+            "Enable Brim", key="shrinkage_enable_brim",
+        )
+        _bc1, _bc2 = st.columns(2)
+        with _bc1:
+            shrinkage_brim_width = st.number_input(
+                "Brim Width (mm)",
+                value=5.0, min_value=0.0, max_value=20.0,
+                step=1.0, format="%.1f", key="shrinkage_brim_width",
+                disabled=not shrinkage_enable_brim,
+            )
+        with _bc2:
+            shrinkage_brim_sep = st.number_input(
+                "Brim Separation (mm)",
+                value=0.10, min_value=0.0, max_value=2.0,
+                step=0.05, format="%.2f", key="shrinkage_brim_sep",
+                disabled=not shrinkage_enable_brim,
+            )
+
         with st.expander("Advanced Slicer Settings"):
             shrinkage_arm_length = st.number_input(
                 "Arm Length (mm)",
@@ -3037,18 +3087,6 @@ def _app() -> None:  # pragma: no cover
                 max_value=2.0,
                 format="%.2f",
                 key="shrinkage_ew",
-            )
-            shrinkage_brim_width = st.number_input(
-                "Brim Width (mm)",
-                value=0.0, min_value=0.0, max_value=20.0,
-                step=1.0, format="%.1f", key="shrinkage_brim_width",
-                help="0 = use slicer default",
-            )
-            shrinkage_brim_sep = st.number_input(
-                "Brim Separation (mm)",
-                value=0.0, min_value=0.0, max_value=2.0,
-                step=0.05, format="%.2f", key="shrinkage_brim_sep",
-                help="0 = use slicer default",
             )
 
         st.info(
@@ -3086,8 +3124,8 @@ def _app() -> None:  # pragma: no cover
                 api_key=None,
                 no_upload=True,
                 print_after_upload=False,
-                brim_width=shrinkage_brim_width or None,
-                brim_separation=shrinkage_brim_sep or None,
+                brim_width=shrinkage_brim_width if shrinkage_enable_brim else None,
+                brim_separation=shrinkage_brim_sep if shrinkage_enable_brim else None,
             )
             with st.spinner("Running shrinkage test pipeline..."):
                 success, log, estimate = run_pipeline(shrinkage_run, args)
@@ -3149,6 +3187,23 @@ def _app() -> None:  # pragma: no cover
                 key="tol_fan",
             )
 
+        tol_enable_brim = st.checkbox("Enable Brim", key="tol_enable_brim")
+        _bc1, _bc2 = st.columns(2)
+        with _bc1:
+            tol_brim_width = st.number_input(
+                "Brim Width (mm)",
+                value=5.0, min_value=0.0, max_value=20.0,
+                step=1.0, format="%.1f", key="tol_brim_width",
+                disabled=not tol_enable_brim,
+            )
+        with _bc2:
+            tol_brim_sep = st.number_input(
+                "Brim Separation (mm)",
+                value=0.10, min_value=0.0, max_value=2.0,
+                step=0.05, format="%.2f", key="tol_brim_sep",
+                disabled=not tol_enable_brim,
+            )
+
         with st.expander("Advanced Slicer Settings",
                           key="tol_advanced"):
             tol_layer_height = st.number_input(
@@ -3164,18 +3219,6 @@ def _app() -> None:  # pragma: no cover
                 max_value=2.0,
                 format="%.2f",
                 key="tol_ew",
-            )
-            tol_brim_width = st.number_input(
-                "Brim Width (mm)",
-                value=0.0, min_value=0.0, max_value=20.0,
-                step=1.0, format="%.1f", key="tol_brim_width",
-                help="0 = use slicer default",
-            )
-            tol_brim_sep = st.number_input(
-                "Brim Separation (mm)",
-                value=0.0, min_value=0.0, max_value=2.0,
-                step=0.05, format="%.2f", key="tol_brim_sep",
-                help="0 = use slicer default",
             )
 
         if st.button("Generate Tolerance Test", type="primary",
@@ -3207,8 +3250,8 @@ def _app() -> None:  # pragma: no cover
                 api_key=None,
                 no_upload=True,
                 print_after_upload=False,
-                brim_width=tol_brim_width or None,
-                brim_separation=tol_brim_sep or None,
+                brim_width=tol_brim_width if tol_enable_brim else None,
+                brim_separation=tol_brim_sep if tol_enable_brim else None,
             )
             with st.spinner("Running tolerance test pipeline..."):
                 success, log, estimate = run_pipeline(tolerance_run, args)
@@ -3279,6 +3322,23 @@ def _app() -> None:  # pragma: no cover
                 key="br_fan",
             )
 
+        br_enable_brim = st.checkbox("Enable Brim", key="br_enable_brim")
+        _bc1, _bc2 = st.columns(2)
+        with _bc1:
+            br_brim_width = st.number_input(
+                "Brim Width (mm)",
+                value=5.0, min_value=0.0, max_value=20.0,
+                step=1.0, format="%.1f", key="br_brim_width",
+                disabled=not br_enable_brim,
+            )
+        with _bc2:
+            br_brim_sep = st.number_input(
+                "Brim Separation (mm)",
+                value=0.10, min_value=0.0, max_value=2.0,
+                step=0.05, format="%.2f", key="br_brim_sep",
+                disabled=not br_enable_brim,
+            )
+
         with st.expander("Advanced Slicer Settings",
                           key="br_advanced"):
             br_layer_height = st.number_input(
@@ -3294,18 +3354,6 @@ def _app() -> None:  # pragma: no cover
                 max_value=2.0,
                 format="%.2f",
                 key="br_ew",
-            )
-            br_brim_width = st.number_input(
-                "Brim Width (mm)",
-                value=0.0, min_value=0.0, max_value=20.0,
-                step=1.0, format="%.1f", key="br_brim_width",
-                help="0 = use slicer default",
-            )
-            br_brim_sep = st.number_input(
-                "Brim Separation (mm)",
-                value=0.0, min_value=0.0, max_value=2.0,
-                step=0.05, format="%.2f", key="br_brim_sep",
-                help="0 = use slicer default",
             )
 
         if st.button("Generate Bridging Test", type="primary",
@@ -3338,8 +3386,8 @@ def _app() -> None:  # pragma: no cover
                 api_key=None,
                 no_upload=True,
                 print_after_upload=False,
-                brim_width=br_brim_width or None,
-                brim_separation=br_brim_sep or None,
+                brim_width=br_brim_width if br_enable_brim else None,
+                brim_separation=br_brim_sep if br_enable_brim else None,
             )
             with st.spinner("Running bridging test pipeline..."):
                 success, log, estimate = run_pipeline(bridge_run, args)
@@ -3401,6 +3449,23 @@ def _app() -> None:  # pragma: no cover
                 key="oh_fan",
             )
 
+        oh_enable_brim = st.checkbox("Enable Brim", key="oh_enable_brim")
+        _bc1, _bc2 = st.columns(2)
+        with _bc1:
+            oh_brim_width = st.number_input(
+                "Brim Width (mm)",
+                value=5.0, min_value=0.0, max_value=20.0,
+                step=1.0, format="%.1f", key="oh_brim_width",
+                disabled=not oh_enable_brim,
+            )
+        with _bc2:
+            oh_brim_sep = st.number_input(
+                "Brim Separation (mm)",
+                value=0.10, min_value=0.0, max_value=2.0,
+                step=0.05, format="%.2f", key="oh_brim_sep",
+                disabled=not oh_enable_brim,
+            )
+
         with st.expander("Advanced Slicer Settings",
                           key="oh_advanced"):
             oh_layer_height = st.number_input(
@@ -3416,18 +3481,6 @@ def _app() -> None:  # pragma: no cover
                 max_value=2.0,
                 format="%.2f",
                 key="oh_ew",
-            )
-            oh_brim_width = st.number_input(
-                "Brim Width (mm)",
-                value=0.0, min_value=0.0, max_value=20.0,
-                step=1.0, format="%.1f", key="oh_brim_width",
-                help="0 = use slicer default",
-            )
-            oh_brim_sep = st.number_input(
-                "Brim Separation (mm)",
-                value=0.0, min_value=0.0, max_value=2.0,
-                step=0.05, format="%.2f", key="oh_brim_sep",
-                help="0 = use slicer default",
             )
 
         if st.button("Generate Overhang Test", type="primary",
@@ -3459,8 +3512,8 @@ def _app() -> None:  # pragma: no cover
                 api_key=None,
                 no_upload=True,
                 print_after_upload=False,
-                brim_width=oh_brim_width or None,
-                brim_separation=oh_brim_sep or None,
+                brim_width=oh_brim_width if oh_enable_brim else None,
+                brim_separation=oh_brim_sep if oh_enable_brim else None,
             )
             with st.spinner("Running overhang test pipeline..."):
                 success, log, estimate = run_pipeline(overhang_run, args)
@@ -3544,6 +3597,23 @@ def _app() -> None:  # pragma: no cover
                 key="cool_fan_speed",
             )
 
+        cool_enable_brim = st.checkbox("Enable Brim", key="cool_enable_brim")
+        _bc1, _bc2 = st.columns(2)
+        with _bc1:
+            cool_brim_width = st.number_input(
+                "Brim Width (mm)",
+                value=5.0, min_value=0.0, max_value=20.0,
+                step=1.0, format="%.1f", key="cool_brim_width",
+                disabled=not cool_enable_brim,
+            )
+        with _bc2:
+            cool_brim_sep = st.number_input(
+                "Brim Separation (mm)",
+                value=0.10, min_value=0.0, max_value=2.0,
+                step=0.05, format="%.2f", key="cool_brim_sep",
+                disabled=not cool_enable_brim,
+            )
+
         cool_level_height = 1.0
         with st.expander("Advanced Slicer Settings",
                           key="cool_advanced"):
@@ -3567,18 +3637,6 @@ def _app() -> None:  # pragma: no cover
                 max_value=2.0,
                 format="%.2f",
                 key="cool_ew",
-            )
-            cool_brim_width = st.number_input(
-                "Brim Width (mm)",
-                value=0.0, min_value=0.0, max_value=20.0,
-                step=1.0, format="%.1f", key="cool_brim_width",
-                help="0 = use slicer default",
-            )
-            cool_brim_sep = st.number_input(
-                "Brim Separation (mm)",
-                value=0.0, min_value=0.0, max_value=2.0,
-                step=0.05, format="%.2f", key="cool_brim_sep",
-                help="0 = use slicer default",
             )
 
         # Level count preview
@@ -3626,8 +3684,8 @@ def _app() -> None:  # pragma: no cover
                 api_key=None,
                 no_upload=True,
                 print_after_upload=False,
-                brim_width=cool_brim_width or None,
-                brim_separation=cool_brim_sep or None,
+                brim_width=cool_brim_width if cool_enable_brim else None,
+                brim_separation=cool_brim_sep if cool_enable_brim else None,
             )
             with st.spinner("Running cooling test pipeline..."):
                 success, log, estimate = run_pipeline(cooling_run, args)
