@@ -1811,14 +1811,14 @@ def _app() -> None:  # pragma: no cover
         with _col_xy:
             res_xy_shrinkage = st.number_input(
                 "XY shrinkage (%)", min_value=0.0, max_value=5.0,
-                step=0.1, format="%.1f",
+                step=0.01, format="%.2f",
                 disabled=not set_shrinkage, key="res_xy_shrinkage",
                 help="Measured XY shrinkage. Compensation = 100 + this value.",
             )
         with _col_z:
             res_z_shrinkage = st.number_input(
                 "Z shrinkage (%)", min_value=0.0, max_value=5.0,
-                step=0.1, format="%.1f",
+                step=0.01, format="%.2f",
                 disabled=not set_shrinkage, key="res_z_shrinkage",
                 help="Measured Z shrinkage. Compensation = 100 + this value.",
             )
