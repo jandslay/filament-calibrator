@@ -10,12 +10,25 @@ import sys
 from pathlib import Path
 import streamlit
 import altair
+from PyInstaller.utils.hooks import copy_metadata, collect_data_files
 
 # --- Paths ---
 streamlit_dir = Path(streamlit.__file__).parent
 altair_dir    = Path(altair.__file__).parent
 
 block_cipher = None
+
+# Package metadata required by Streamlit and dependencies at runtime
+_metadata = []
+for pkg in [
+    "streamlit", "altair", "pydeck", "pandas", "pyarrow",
+    "pillow", "protobuf", "click", "gitpython", "watchdog",
+    "filament-calibrator",
+]:
+    try:
+        _metadata += copy_metadata(pkg)
+    except Exception:
+        pass
 
 a = Analysis(
     # Entry point: launches Streamlit with our gui.py
@@ -27,10 +40,12 @@ a = Analysis(
         (str(streamlit_dir / "static"),       "streamlit/static"),
         (str(streamlit_dir / "runtime"),      "streamlit/runtime"),
         # Altair Vega schemas
-        (str(altair_dir / "vega"),            "altair/vega"),
+        (str(altair_dir / "vegalite"),        "altair/vegalite"),
+        # All Python source files — Streamlit needs gui.py as text at runtime
+        ("src/filament_calibrator/*.py",      "filament_calibrator"),
         # Our locale files (German translation)
         ("src/filament_calibrator/locale",    "filament_calibrator/locale"),
-    ],
+    ] + _metadata,
     hiddenimports=[
         "streamlit",
         "streamlit.web.cli",
@@ -71,7 +86,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=False,          # No console window
+    console=True,          # No console window
     disable_windowed_traceback=False,
     target_arch=None,
     codesign_identity=None,
