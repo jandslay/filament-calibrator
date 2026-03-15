@@ -22,7 +22,7 @@ CLI-Tool-Suite zur Filamentkalibrierung für Prusa-Drucker — mit vollständig 
 
 ## Schnellstart — Windows (empfohlen)
 
-1. Neueste Version unter [Releases](https://github.com/jandslay/filament-calibrator/releases) herunterladen
+1. Unter [Releases](https://github.com/jandslay/filament-calibrator/releases) die Datei **`FilamentCalibrator-v1.0-Windows-german.zip`** herunterladen
 2. ZIP entpacken
 3. `FilamentCalibrator.exe` starten
 4. Browser öffnet sich automatisch auf `http://localhost:8501`
