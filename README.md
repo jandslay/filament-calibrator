@@ -1,55 +1,58 @@
-# filament-calibrator
+# filament-calibrator (Deutsche Version)
 
 [![Tests](https://github.com/hyiger/filament-calibrator/actions/workflows/test.yml/badge.svg)](https://github.com/hyiger/filament-calibrator/actions/workflows/test.yml)
-[![PyPI](https://img.shields.io/pypi/v/filament-calibrator)](https://pypi.org/project/filament-calibrator/)
 
-CLI tool suite for 3D printer filament calibration on Prusa printers.
+> **Hinweis:** Dies ist ein inoffizieller Fork von [hyiger/filament-calibrator](https://github.com/hyiger/filament-calibrator) mit deutscher Benutzeroberfläche.
 
-## Calibration Tools
+CLI-Tool-Suite zur Filamentkalibrierung für Prusa-Drucker — mit vollständig **deutscher GUI**.
 
-- **[Temperature Tower](docs/temperature-tower.md)** — find the optimal printing temperature for a filament
-- **[Extrusion Multiplier](docs/extrusion-multiplier.md)** — measure wall thickness to calculate the correct extrusion multiplier
-- **[Volumetric Flow](docs/volumetric-flow.md)** — determine maximum volumetric flow rate for a filament/hotend combination
-- **[Pressure Advance](docs/pressure-advance.md)** — find the optimal PA/Linear Advance value (tower or chevron pattern method)
-- **[Retraction Test](docs/retraction-test.md)** — find the optimal retraction distance by inspecting stringing between two towers
-- **[Retraction Speed](docs/retraction-speed.md)** — find the optimal retraction speed (varies speed while keeping length fixed)
-- **[Shrinkage Test](docs/shrinkage.md)** — measure per-axis shrinkage (X/Y/Z) by printing a 3-axis calibration cross
-- **[Tolerance Test](docs/tolerance-test.md)** — measure hole/peg dimensional accuracy with calipers
-- **[Bridging Test](docs/bridging-test.md)** — evaluate bridge quality at increasing span lengths
-- **[Overhang Test](docs/overhang-test.md)** — evaluate overhang quality at increasing angles (supports disabled)
-- **[Cooling Test](docs/cooling-test.md)** — find optimal fan speed by varying cooling at each height level
+## Kalibrierungswerkzeuge
 
-## Quick Start
+- **Temperaturturm** — optimale Drucktemperatur für ein Filament ermitteln
+- **Extrusionsmultiplikator** — Wandstärke messen und korrekten EM berechnen
+- **Volumetrischer Durchfluss** — maximale Fließrate für Filament/Hotend-Kombination bestimmen
+- **Pressure Advance** — optimalen PA/Linear-Advance-Wert finden (Turm- oder Chevron-Methode)
+- **Retraktionstest** — optimale Retraktionslänge durch Stringing-Vergleich ermitteln
+- **Retraktionsgeschwindigkeit** — optimale Retraktionsgeschwindigkeit bei fester Länge finden
+- **Schwundtest** — Achsenschwund (X/Y/Z) mit einem 3-Achsen-Kreuz messen
+- **Toleranztest** — Loch-/Zapfenmaßgenauigkeit mit Messschieber prüfen
+- **Brückentest** — Brückenqualität bei zunehmenden Spannweiten beurteilen
+- **Überhangtest** — Überhangqualität bei zunehmenden Winkeln beurteilen (ohne Stützen)
+- **Kühltest** — optimale Lüftergeschwindigkeit durch Variation je Höhenstufe finden
 
-Install from PyPI (recommended on **Python 3.10 or 3.12**; requires **PrusaSlicer** on
-your PATH):
+## Schnellstart — Windows (empfohlen)
 
-```bash
-uv tool install "filament-calibrator[gui]" --python 3.12
-```
+1. Neueste Version unter [Releases](https://github.com/jandslay/filament-calibrator/releases) herunterladen
+2. ZIP entpacken
+3. `FilamentCalibrator.exe` starten
+4. Browser öffnet sich automatisch auf `http://localhost:8501`
 
-Or download a standalone GUI binary from
-[Releases](https://github.com/hyiger/filament-calibrator/releases) — no
-Python needed.
+Kein Python-Install erforderlich. **PrusaSlicer** muss installiert sein.
 
-## Documentation
+## Installation aus dem Quellcode
 
-- **[Installation Guide](docs/installation.md)** — PyPI, standalone GUI,
-  Windows, Raspberry Pi, conda, and source install options
-- **[GUI User's Guide](docs/gui.md)** — walkthrough of the browser
-  interface with screenshots
-- **[Configuration](docs/configuration.md)** — TOML config file for saving
-  printer URL, API key, filament type, and other defaults
-
-## GUI
-
-A [browser-based GUI](docs/gui.md) wraps all eleven tools:
+Erfordert **Python 3.10 oder 3.12** sowie **PrusaSlicer** im PATH:
 
 ```bash
+pip install -e ".[gui]"
 filament-calibrator-gui
 ```
 
-## Development
+## Sprache
+
+Die Benutzeroberfläche erkennt die Systemsprache automatisch.  
+Deutsch wird geladen wenn Windows auf Deutsch eingestellt ist.  
+Englisch wird als Fallback verwendet wenn keine Übersetzung gefunden wird.
+
+## Unterschiede zum Original
+
+| | Original | Dieser Fork |
+|---|---|---|
+| Sprache | Englisch | Deutsch (automatisch) |
+| Windows-Binary | ✓ | ✓ |
+| Funktionsumfang | vollständig | identisch |
+
+## Entwicklung
 
 ```bash
 pip install -e ".[dev]"
@@ -57,8 +60,6 @@ pytest tests/ --cov=src/filament_calibrator --cov-report=term-missing \
   --cov-fail-under=100
 ```
 
-100% statement coverage is enforced.
+## Lizenz
 
-## License
-
-GPL-3.0-only
+GPL-3.0-only — basierend auf [hyiger/filament-calibrator](https://github.com/hyiger/filament-calibrator)
