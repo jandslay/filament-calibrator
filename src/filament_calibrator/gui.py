@@ -32,6 +32,14 @@ from filament_calibrator.ini_writer import (
     merge_results_into_ini,
 )
 
+# i18n bootstrap
+import builtins as _builtins
+if '_' not in _builtins.__dict__:
+    from filament_calibrator.i18n import setup as _i18n_setup
+    _i18n_setup()
+if '_' not in _builtins.__dict__:
+    _builtins._ = lambda s: s
+
 
 # ---------------------------------------------------------------------------
 # Helpers (importable without Streamlit for testing)
@@ -1376,7 +1384,7 @@ def _app() -> None:  # pragma: no cover
         page_title="Filament Calibrator",
         layout="wide",
     )
-    st.title("Filament Calibrator")
+    st.title(_("Filament Calibrator"))
 
     # Load TOML config defaults on first render only.
     if "_toml_loaded" not in st.session_state:
@@ -1447,7 +1455,7 @@ def _app() -> None:  # pragma: no cover
 
     # --- Sidebar: shared settings ---
     with st.sidebar:
-        st.header("Common Settings")
+        st.header(_("Common Settings"))
 
         # Build options list; include any custom type from .ini that isn't
         # in the preset list so the dropdown reflects the config exactly.
@@ -1479,22 +1487,22 @@ def _app() -> None:  # pragma: no cover
             nozzle_high_flow = st.checkbox(
                 "High Flow",
                 key="sidebar_nozzle_high_flow",
-                help="Nozzle is a high-flow variant (sets F flag in M862.1)",
+                help=_("Nozzle is a high-flow variant (sets F flag in M862.1)"),
             )
             nozzle_hardened = st.checkbox(
                 "Hardened",
                 key="sidebar_nozzle_hardened",
-                help="Nozzle is hardened/abrasive-resistant (sets A flag in M862.1)",
+                help=_("Nozzle is hardened/abrasive-resistant (sets A flag in M862.1)"),
             )
 
         ascii_gcode = st.checkbox(
             "ASCII G-code (.gcode)",
             value=False,
-            help="Default is binary (.bgcode) with thumbnail previews",
+            help=_("Default is binary (.bgcode) with thumbnail previews"),
         )
 
         st.divider()
-        st.subheader("PrusaLink Upload")
+        st.subheader(_("PrusaLink Upload"))
         _has_upload_cfg = bool(
             st.session_state.get("printer_url")
             and st.session_state.get("api_key")
@@ -1515,20 +1523,20 @@ def _app() -> None:  # pragma: no cover
             )
 
         st.divider()
-        st.subheader("Advanced")
+        st.subheader(_("Advanced"))
 
         col_ini, col_ini_btn = st.columns([5, 1])
         with col_ini:
             config_ini = st.text_input(
                 "PrusaSlicer config (.ini)",
-                placeholder="Leave empty for built-in defaults",
+                placeholder=_("Leave empty for built-in defaults"),
                 key="config_ini",
             )
         with col_ini_btn:
             st.markdown("<div style='padding-top:28px'></div>",
                         unsafe_allow_html=True)
             if st.button("📂", key="browse_ini",
-                         help="Browse for .ini config"):
+                         help=_("Browse for .ini config")):
                 path = _open_file_dialog(
                     title="Select PrusaSlicer config",
                     filetypes=[("INI files", "*.ini")],
@@ -1541,14 +1549,14 @@ def _app() -> None:  # pragma: no cover
         with col_ps:
             prusaslicer_path = st.text_input(
                 "PrusaSlicer path",
-                placeholder="Auto-detect",
+                placeholder=_("Auto-detect"),
                 key="prusaslicer_path",
             )
         with col_ps_btn:
             st.markdown("<div style='padding-top:28px'></div>",
                         unsafe_allow_html=True)
             if st.button("📂", key="browse_ps",
-                         help="Browse for PrusaSlicer"):
+                         help=_("Browse for PrusaSlicer")):
                 path = _open_file_dialog(
                     title="Select PrusaSlicer executable",
                 )
@@ -1560,14 +1568,14 @@ def _app() -> None:  # pragma: no cover
         with col_od:
             custom_output_dir = st.text_input(
                 "Output directory",
-                placeholder="Auto (temp directory)",
+                placeholder=_("Auto (temp directory)"),
                 key="output_dir",
             )
         with col_od_btn:
             st.markdown("<div style='padding-top:28px'></div>",
                         unsafe_allow_html=True)
             if st.button("📂", key="browse_dir",
-                         help="Browse for directory"):
+                         help=_("Browse for directory")):
                 path = _open_directory_dialog(
                     title="Select output directory",
                 )
@@ -1707,15 +1715,15 @@ def _app() -> None:  # pragma: no cover
     # --- Tabs ---
     (tab_workflow, tab_temp, tab_em, tab_retraction, tab_pa, tab_flow,
      tab_shrinkage, tab_bridge_overhang, tab_cooling) = st.tabs([
-        "Workflow",
-        "Temperature Tower", "Extrusion Multiplier", "Retraction",
-        "Pressure Advance", "Volumetric Flow", "Shrinkage & Tolerance",
-        "Bridging & Overhang", "Cooling",
+        _("Workflow"),
+        _("Temperature Tower"), _("Extrusion Multiplier"), _("Retraction"),
+        _("Pressure Advance"), _("Volumetric Flow"), _("Shrinkage & Tolerance"),
+        _("Bridging & Overhang"), _("Cooling"),
     ])
 
     # === Workflow Tab (includes calibration results) ===
     with tab_workflow:
-        st.subheader("Guided Calibration Workflow")
+        st.subheader(_("Guided Calibration Workflow"))
         st.caption(
             "Follow these steps in order to calibrate your filament. "
             "Check a step and enter a value to mark it as completed. "
@@ -1739,7 +1747,7 @@ def _app() -> None:  # pragma: no cover
         total_count = len(wf_status)
         st.progress(
             completed_count / total_count if total_count else 0,
-            text=f"{completed_count}/{total_count} steps completed",
+            text=_("{completed_count}/{total_count} steps completed").format(completed_count=completed_count, total_count=total_count),
         )
 
         # --- Interactive workflow steps (with inline value entry) ---
@@ -1838,17 +1846,17 @@ def _app() -> None:  # pragma: no cover
                 "XY shrinkage (%)", min_value=0.0, max_value=5.0,
                 step=0.01, format="%.2f",
                 disabled=not set_shrinkage, key="res_xy_shrinkage",
-                help="Measured XY shrinkage. Compensation = 100 + this value.",
+                help=_("Measured XY shrinkage. Compensation = 100 + this value."),
             )
         with _col_z:
             res_z_shrinkage = st.number_input(
                 "Z shrinkage (%)", min_value=0.0, max_value=5.0,
                 step=0.01, format="%.2f",
                 disabled=not set_shrinkage, key="res_z_shrinkage",
-                help="Measured Z shrinkage. Compensation = 100 + this value.",
+                help=_("Measured Z shrinkage. Compensation = 100 + this value."),
             )
 
-        if st.button("Reset all results", key="wf_reset"):
+        if st.button(_("Reset all results"), key="wf_reset"):
             for _step in wf_status:
                 st.session_state[_step["set_key"]] = False
             st.rerun()
@@ -1904,7 +1912,7 @@ def _app() -> None:  # pragma: no cover
         )
         if has_any:
             summary = build_change_summary(results)
-            st.markdown("### Changes")
+            st.markdown(_("### Changes"))
             st.markdown(summary)
 
         # Merge & download (only if a config.ini is loaded)
@@ -1930,7 +1938,7 @@ def _app() -> None:  # pragma: no cover
 
         # --- Export / Import / Backup ---
         st.divider()
-        st.markdown("### File Management")
+        st.markdown(_("### File Management"))
 
         exp_col, imp_col, bak_col = st.columns(3)
 
@@ -1945,7 +1953,7 @@ def _app() -> None:  # pragma: no cover
                     key="export_results_json",
                 )
             else:
-                st.caption("No results file to export.")
+                st.caption(_("No results file to export."))
 
         with imp_col:
             uploaded = st.file_uploader(
@@ -1970,12 +1978,12 @@ def _app() -> None:  # pragma: no cover
                     st.warning(msg)
 
         with bak_col:
-            if st.button("Save with backup", key="backup_and_save"):
+            if st.button(_("Save with backup"), key="backup_and_save"):
                 bak = backup_results_file()
                 if bak is not None:
-                    st.success(f"Backup: {bak.name}")
+                    st.success(_("Backup: {name}").format(name=bak.name))
                 else:
-                    st.info("No existing file to back up.")
+                    st.info(_("No existing file to back up."))
                 save_results(
                     filament_type, nozzle_size, printer,
                     results_to_dict(
@@ -1995,11 +2003,11 @@ def _app() -> None:  # pragma: no cover
                         z_shrinkage=float(res_z_shrinkage),
                     ),
                 )
-                st.success("Results saved.")
+                st.success(_("Results saved."))
 
     # === Tab 1: Temperature Tower ===
     with tab_temp:
-        st.subheader("Temperature Tower")
+        st.subheader(_("Temperature Tower"))
         st.caption(
             "Generate a tower that prints at decreasing temperatures "
             "from bottom to top to find optimal print temperature."
@@ -2050,19 +2058,19 @@ def _app() -> None:  # pragma: no cover
 
         col6, col7 = st.columns(2)
         with col6:
-            brand_top = st.text_input("Brand Label (top)", value="", key="tt_brand_top")
+            brand_top = st.text_input(_("Brand Label (top)"), value="", key="tt_brand_top")
         with col7:
-            brand_bottom = st.text_input("Brand Label (bottom)", value="", key="tt_brand_bottom")
+            brand_bottom = st.text_input(_("Brand Label (bottom)"), value="", key="tt_brand_bottom")
 
         # Tier count preview
         spread = start_temp - end_temp
         if spread > 0 and temp_step > 0 and spread % temp_step == 0:
             num_tiers = spread // temp_step + 1
-            st.info(f"{num_tiers} tiers: {start_temp}\u00b0C \u2192 {end_temp}\u00b0C")
+            st.info(_("{num_tiers} tiers: {start_temp}\u00b0C \u2192 {end_temp}\u00b0C").format(num_tiers=num_tiers, start_temp=start_temp, end_temp=end_temp))
         elif spread <= 0:
-            st.warning("Start temp must be higher than end temp.")
+            st.warning(_("Start temp must be higher than end temp."))
 
-        tt_enable_brim = st.checkbox("Enable Brim", key="tt_enable_brim")
+        tt_enable_brim = st.checkbox(_("Enable Brim"), key="tt_enable_brim")
         _bc1, _bc2 = st.columns(2)
         with _bc1:
             tt_brim_width = st.number_input(
@@ -2079,7 +2087,7 @@ def _app() -> None:  # pragma: no cover
                 disabled=not tt_enable_brim,
             )
 
-        if st.button("Generate Temperature Tower", type="primary",
+        if st.button(_("Generate Temperature Tower"), type="primary",
                       key="run_temp"):
             _temp_err = _check_printer_temps(printer, start_temp, tt_bed_temp)
             if _temp_err:
@@ -2110,7 +2118,7 @@ def _app() -> None:  # pragma: no cover
                 brim_width=tt_brim_width if tt_enable_brim else None,
                 brim_separation=tt_brim_sep if tt_enable_brim else None,
             )
-            with st.spinner("Running temperature tower pipeline..."):
+            with st.spinner(_("Running temperature tower pipeline...")):
                 success, log, estimate = run_pipeline(temp_run, args)
             st.session_state["_last_run"] = {
                 "output_dir": run_dir,
@@ -2134,7 +2142,7 @@ def _app() -> None:  # pragma: no cover
 
     # === Tab 2: Extrusion Multiplier ===
     with tab_em:
-        st.subheader("Extrusion Multiplier")
+        st.subheader(_("Extrusion Multiplier"))
         st.caption(
             "Generate a 40mm cube sliced in vase mode with classic walls. "
             "Print it, measure the wall thickness with calipers, and "
@@ -2164,7 +2172,7 @@ def _app() -> None:  # pragma: no cover
                 key="em_fan",
             )
 
-        em_enable_brim = st.checkbox("Enable Brim", key="em_enable_brim")
+        em_enable_brim = st.checkbox(_("Enable Brim"), key="em_enable_brim")
         _bc1, _bc2 = st.columns(2)
         with _bc1:
             em_brim_width = st.number_input(
@@ -2181,7 +2189,7 @@ def _app() -> None:  # pragma: no cover
                 disabled=not em_enable_brim,
             )
 
-        with st.expander("Advanced Slicer Settings"):
+        with st.expander(_("Advanced Slicer Settings")):
             em_cube_size = st.number_input(
                 "Cube Size (mm)",
                 value=40.0,
@@ -2205,9 +2213,9 @@ def _app() -> None:  # pragma: no cover
                 key="em_ew",
             )
 
-        st.info(f"Expected wall thickness: {em_extrusion_width:.2f} mm")
+        st.info(_("Expected wall thickness: {em_extrusion_width} mm").format(em_extrusion_width=em_extrusion_width))
 
-        if st.button("Generate EM Cube", type="primary",
+        if st.button(_("Generate EM Cube"), type="primary",
                       key="run_em"):
             _temp_err = _check_printer_temps(
                 printer, em_nozzle_temp, em_bed_temp,
@@ -2239,7 +2247,7 @@ def _app() -> None:  # pragma: no cover
                 brim_width=em_brim_width if em_enable_brim else None,
                 brim_separation=em_brim_sep if em_enable_brim else None,
             )
-            with st.spinner("Running extrusion multiplier pipeline..."):
+            with st.spinner(_("Running extrusion multiplier pipeline...")):
                 success, log, estimate = run_pipeline(em_run, args)
             st.session_state["_last_run"] = {
                 "output_dir": run_dir,
@@ -2263,7 +2271,7 @@ def _app() -> None:  # pragma: no cover
 
     # === Tab 3: Retraction ===
     with tab_retraction:
-        st.subheader("Retraction")
+        st.subheader(_("Retraction"))
 
         retraction_mode = st.radio(
             "Mode", ["Distance", "Speed"],
@@ -2349,7 +2357,7 @@ def _app() -> None:  # pragma: no cover
                 )
 
             retraction_level_height = 1.0
-            with st.expander("Advanced Slicer Settings"):
+            with st.expander(_("Advanced Slicer Settings")):
                 retraction_level_height = st.number_input(
                     "Level Height (mm)",
                     value=1.0,
@@ -2386,7 +2394,7 @@ def _app() -> None:  # pragma: no cover
                     f"{start_retraction:.1f} \u2192 {end_retraction:.1f} mm"
                 )
 
-            if st.button("Generate Retraction", type="primary",
+            if st.button(_("Generate Retraction"), type="primary",
                           key="run_retraction"):
                 _temp_err = _check_printer_temps(
                     printer, retraction_nozzle_temp, retraction_bed_temp,
@@ -2421,7 +2429,7 @@ def _app() -> None:  # pragma: no cover
                     brim_width=retraction_brim_width if retraction_enable_brim else None,
                     brim_separation=retraction_brim_sep if retraction_enable_brim else None,
                 )
-                with st.spinner("Running retraction test pipeline..."):
+                with st.spinner(_("Running retraction test pipeline...")):
                     success, log, estimate = run_pipeline(retraction_run, args)
                 st.session_state["_last_run"] = {
                     "output_dir": run_dir,
@@ -2532,7 +2540,7 @@ def _app() -> None:  # pragma: no cover
                 )
 
             rs_level_height = 1.0
-            with st.expander("Advanced Slicer Settings"):
+            with st.expander(_("Advanced Slicer Settings")):
                 rs_level_height = st.number_input(
                     "Level Height (mm)",
                     value=1.0,
@@ -2568,7 +2576,7 @@ def _app() -> None:  # pragma: no cover
                     f"{rs_start_speed:.1f} \u2192 {rs_end_speed:.1f} mm/s"
                 )
 
-            if st.button("Generate Retraction Speed",
+            if st.button(_("Generate Retraction Speed"),
                           type="primary", key="run_retraction_speed"):
                 _temp_err = _check_printer_temps(
                     printer, rs_nozzle_temp, rs_bed_temp,
@@ -2632,7 +2640,7 @@ def _app() -> None:  # pragma: no cover
 
     # === Tab 4: Pressure Advance ===
     with tab_pa:
-        st.subheader("Pressure Advance")
+        st.subheader(_("Pressure Advance"))
         pa_method = st.radio(
             "Method",
             options=["Tower", "Pattern"],
@@ -2708,7 +2716,7 @@ def _app() -> None:  # pragma: no cover
                 key="pa_fan",
             )
 
-        pa_enable_brim = st.checkbox("Enable Brim", key="pa_enable_brim")
+        pa_enable_brim = st.checkbox(_("Enable Brim"), key="pa_enable_brim")
         _bc1, _bc2 = st.columns(2)
         with _bc1:
             pa_brim_width = st.number_input(
@@ -2734,7 +2742,7 @@ def _app() -> None:  # pragma: no cover
         pa_pattern_spacing = 1.6
         pa_frame_offset = 0.0
         if method_key == "pattern":
-            with st.expander("Pattern Settings"):
+            with st.expander(_("Pattern Settings")):
                 pa_corner_angle = st.number_input(
                     "Corner Angle (\u00b0)",
                     value=90.0,
@@ -2787,7 +2795,7 @@ def _app() -> None:  # pragma: no cover
                 )
 
         pa_level_height = 1.0
-        with st.expander("Advanced Slicer Settings"):
+        with st.expander(_("Advanced Slicer Settings")):
             if method_key == "tower":
                 pa_level_height = st.number_input(
                     "Level Height (mm)",
@@ -2820,7 +2828,7 @@ def _app() -> None:  # pragma: no cover
                 f"PA {start_pa:.4f} \u2192 {end_pa:.4f}"
             )
 
-        if st.button("Generate PA Calibration", type="primary",
+        if st.button(_("Generate PA Calibration"), type="primary",
                       key="run_pa"):
             _temp_err = _check_printer_temps(
                 printer, pa_nozzle_temp, pa_bed_temp,
@@ -2863,7 +2871,7 @@ def _app() -> None:  # pragma: no cover
                 brim_width=pa_brim_width if pa_enable_brim else None,
                 brim_separation=pa_brim_sep if pa_enable_brim else None,
             )
-            with st.spinner("Running pressure advance pipeline..."):
+            with st.spinner(_("Running pressure advance pipeline...")):
                 success, log, estimate = run_pipeline(pa_run, args)
             st.session_state["_last_run"] = {
                 "output_dir": run_dir,
@@ -2887,7 +2895,7 @@ def _app() -> None:  # pragma: no cover
 
     # === Tab 5: Volumetric Flow ===
     with tab_flow:
-        st.subheader("Volumetric Flow")
+        st.subheader(_("Volumetric Flow"))
         st.caption(
             "Generate a serpentine vase-mode specimen with increasing "
             "print speeds to find maximum volumetric flow rate."
@@ -2945,7 +2953,7 @@ def _app() -> None:  # pragma: no cover
                 key="flow_fan",
             )
 
-        flow_enable_brim = st.checkbox("Enable Brim", key="flow_enable_brim")
+        flow_enable_brim = st.checkbox(_("Enable Brim"), key="flow_enable_brim")
         _bc1, _bc2 = st.columns(2)
         with _bc1:
             flow_brim_width = st.number_input(
@@ -2962,7 +2970,7 @@ def _app() -> None:  # pragma: no cover
                 disabled=not flow_enable_brim,
             )
 
-        with st.expander("Advanced Slicer Settings"):
+        with st.expander(_("Advanced Slicer Settings")):
             flow_level_height = st.number_input(
                 "Level Height (mm)",
                 value=1.0,
@@ -2993,7 +3001,7 @@ def _app() -> None:  # pragma: no cover
                 f"{start_speed:.1f} \u2192 {end_speed:.1f} mm\u00b3/s"
             )
 
-        if st.button("Generate Flow Specimen", type="primary",
+        if st.button(_("Generate Flow Specimen"), type="primary",
                       key="run_flow"):
             _temp_err = _check_printer_temps(
                 printer, flow_nozzle_temp, flow_bed_temp,
@@ -3028,7 +3036,7 @@ def _app() -> None:  # pragma: no cover
                 brim_width=flow_brim_width if flow_enable_brim else None,
                 brim_separation=flow_brim_sep if flow_enable_brim else None,
             )
-            with st.spinner("Running volumetric flow pipeline..."):
+            with st.spinner(_("Running volumetric flow pipeline...")):
                 success, log, estimate = run_pipeline(flow_run, args)
             st.session_state["_last_run"] = {
                 "output_dir": run_dir,
@@ -3052,7 +3060,7 @@ def _app() -> None:  # pragma: no cover
 
     # === Tab 6: Shrinkage & Tolerance ===
     with tab_shrinkage:
-        st.subheader("Shrinkage Test")
+        st.subheader(_("Shrinkage Test"))
         st.caption(
             "Generate a 3-axis calibration cross. Print it, measure each "
             "arm with calipers, and calculate: "
@@ -3101,7 +3109,7 @@ def _app() -> None:  # pragma: no cover
                 disabled=not shrinkage_enable_brim,
             )
 
-        with st.expander("Advanced Slicer Settings"):
+        with st.expander(_("Advanced Slicer Settings")):
             shrinkage_arm_length = st.number_input(
                 "Arm Length (mm)",
                 value=100.0,
@@ -3131,7 +3139,7 @@ def _app() -> None:  # pragma: no cover
             f"Z={shrinkage_arm_length:.1f} mm"
         )
 
-        if st.button("Generate Shrinkage Cross", type="primary",
+        if st.button(_("Generate Shrinkage Cross"), type="primary",
                       key="run_shrinkage"):
             _temp_err = _check_printer_temps(
                 printer, shrinkage_nozzle_temp, shrinkage_bed_temp,
@@ -3163,7 +3171,7 @@ def _app() -> None:  # pragma: no cover
                 brim_width=shrinkage_brim_width if shrinkage_enable_brim else None,
                 brim_separation=shrinkage_brim_sep if shrinkage_enable_brim else None,
             )
-            with st.spinner("Running shrinkage test pipeline..."):
+            with st.spinner(_("Running shrinkage test pipeline...")):
                 success, log, estimate = run_pipeline(shrinkage_run, args)
             st.session_state["_last_run"] = {
                 "output_dir": run_dir,
@@ -3187,7 +3195,7 @@ def _app() -> None:  # pragma: no cover
 
         # --- Tolerance section ---
         st.divider()
-        st.subheader("Tolerance Test")
+        st.subheader(_("Tolerance Test"))
         st.caption(
             "Generate a set of cylindrical pins and holes at various "
             "diameters to find the ideal tolerance offset for your "
@@ -3223,7 +3231,7 @@ def _app() -> None:  # pragma: no cover
                 key="tol_fan",
             )
 
-        tol_enable_brim = st.checkbox("Enable Brim", key="tol_enable_brim")
+        tol_enable_brim = st.checkbox(_("Enable Brim"), key="tol_enable_brim")
         _bc1, _bc2 = st.columns(2)
         with _bc1:
             tol_brim_width = st.number_input(
@@ -3240,7 +3248,7 @@ def _app() -> None:  # pragma: no cover
                 disabled=not tol_enable_brim,
             )
 
-        with st.expander("Advanced Slicer Settings",
+        with st.expander(_("Advanced Slicer Settings"),
                           key="tol_advanced"):
             tol_layer_height = st.number_input(
                 "Layer Height (mm)",
@@ -3257,7 +3265,7 @@ def _app() -> None:  # pragma: no cover
                 key="tol_ew",
             )
 
-        if st.button("Generate Tolerance Test", type="primary",
+        if st.button(_("Generate Tolerance Test"), type="primary",
                       key="run_tolerance"):
             _temp_err = _check_printer_temps(
                 printer, tol_nozzle_temp, tol_bed_temp,
@@ -3289,7 +3297,7 @@ def _app() -> None:  # pragma: no cover
                 brim_width=tol_brim_width if tol_enable_brim else None,
                 brim_separation=tol_brim_sep if tol_enable_brim else None,
             )
-            with st.spinner("Running tolerance test pipeline..."):
+            with st.spinner(_("Running tolerance test pipeline...")):
                 success, log, estimate = run_pipeline(tolerance_run, args)
             st.session_state["_last_run"] = {
                 "output_dir": run_dir,
@@ -3314,7 +3322,7 @@ def _app() -> None:  # pragma: no cover
     # === Tab 7: Bridging & Overhang ===
     with tab_bridge_overhang:
         # --- Bridging section ---
-        st.subheader("Bridging Test")
+        st.subheader(_("Bridging Test"))
         st.caption(
             "Generate a bridging specimen with pillars at increasing "
             "span distances to find the maximum unsupported bridge "
@@ -3358,7 +3366,7 @@ def _app() -> None:  # pragma: no cover
                 key="br_fan",
             )
 
-        br_enable_brim = st.checkbox("Enable Brim", key="br_enable_brim")
+        br_enable_brim = st.checkbox(_("Enable Brim"), key="br_enable_brim")
         _bc1, _bc2 = st.columns(2)
         with _bc1:
             br_brim_width = st.number_input(
@@ -3375,7 +3383,7 @@ def _app() -> None:  # pragma: no cover
                 disabled=not br_enable_brim,
             )
 
-        with st.expander("Advanced Slicer Settings",
+        with st.expander(_("Advanced Slicer Settings"),
                           key="br_advanced"):
             br_layer_height = st.number_input(
                 "Layer Height (mm)",
@@ -3392,7 +3400,7 @@ def _app() -> None:  # pragma: no cover
                 key="br_ew",
             )
 
-        if st.button("Generate Bridging Test", type="primary",
+        if st.button(_("Generate Bridging Test"), type="primary",
                       key="run_bridge"):
             _temp_err = _check_printer_temps(
                 printer, br_nozzle_temp, br_bed_temp,
@@ -3425,7 +3433,7 @@ def _app() -> None:  # pragma: no cover
                 brim_width=br_brim_width if br_enable_brim else None,
                 brim_separation=br_brim_sep if br_enable_brim else None,
             )
-            with st.spinner("Running bridging test pipeline..."):
+            with st.spinner(_("Running bridging test pipeline...")):
                 success, log, estimate = run_pipeline(bridge_run, args)
             st.session_state["_last_run"] = {
                 "output_dir": run_dir,
@@ -3449,7 +3457,7 @@ def _app() -> None:  # pragma: no cover
 
         # --- Overhang section ---
         st.divider()
-        st.subheader("Overhang Test")
+        st.subheader(_("Overhang Test"))
         st.caption(
             "Generate a specimen with overhangs at increasing angles "
             "to determine the maximum overhang angle your printer "
@@ -3485,7 +3493,7 @@ def _app() -> None:  # pragma: no cover
                 key="oh_fan",
             )
 
-        oh_enable_brim = st.checkbox("Enable Brim", key="oh_enable_brim")
+        oh_enable_brim = st.checkbox(_("Enable Brim"), key="oh_enable_brim")
         _bc1, _bc2 = st.columns(2)
         with _bc1:
             oh_brim_width = st.number_input(
@@ -3502,7 +3510,7 @@ def _app() -> None:  # pragma: no cover
                 disabled=not oh_enable_brim,
             )
 
-        with st.expander("Advanced Slicer Settings",
+        with st.expander(_("Advanced Slicer Settings"),
                           key="oh_advanced"):
             oh_layer_height = st.number_input(
                 "Layer Height (mm)",
@@ -3519,7 +3527,7 @@ def _app() -> None:  # pragma: no cover
                 key="oh_ew",
             )
 
-        if st.button("Generate Overhang Test", type="primary",
+        if st.button(_("Generate Overhang Test"), type="primary",
                       key="run_overhang"):
             _temp_err = _check_printer_temps(
                 printer, oh_nozzle_temp, oh_bed_temp,
@@ -3551,7 +3559,7 @@ def _app() -> None:  # pragma: no cover
                 brim_width=oh_brim_width if oh_enable_brim else None,
                 brim_separation=oh_brim_sep if oh_enable_brim else None,
             )
-            with st.spinner("Running overhang test pipeline..."):
+            with st.spinner(_("Running overhang test pipeline...")):
                 success, log, estimate = run_pipeline(overhang_run, args)
             st.session_state["_last_run"] = {
                 "output_dir": run_dir,
@@ -3575,7 +3583,7 @@ def _app() -> None:  # pragma: no cover
 
     # === Tab 8: Cooling ===
     with tab_cooling:
-        st.subheader("Cooling Test")
+        st.subheader(_("Cooling Test"))
         st.caption(
             "Generate a tower that prints at varying fan speeds from "
             "bottom to top to find the optimal cooling for your filament."
@@ -3633,7 +3641,7 @@ def _app() -> None:  # pragma: no cover
                 key="cool_fan_speed",
             )
 
-        cool_enable_brim = st.checkbox("Enable Brim", key="cool_enable_brim")
+        cool_enable_brim = st.checkbox(_("Enable Brim"), key="cool_enable_brim")
         _bc1, _bc2 = st.columns(2)
         with _bc1:
             cool_brim_width = st.number_input(
@@ -3651,7 +3659,7 @@ def _app() -> None:  # pragma: no cover
             )
 
         cool_level_height = 1.0
-        with st.expander("Advanced Slicer Settings",
+        with st.expander(_("Advanced Slicer Settings"),
                           key="cool_advanced"):
             cool_level_height = st.number_input(
                 "Level Height (mm)",
@@ -3688,7 +3696,7 @@ def _app() -> None:  # pragma: no cover
                 f"{cool_start_fan}% \u2192 {cool_end_fan}%"
             )
 
-        if st.button("Generate Cooling Test", type="primary",
+        if st.button(_("Generate Cooling Test"), type="primary",
                       key="run_cooling"):
             _temp_err = _check_printer_temps(
                 printer, cool_nozzle_temp, cool_bed_temp,
@@ -3723,7 +3731,7 @@ def _app() -> None:  # pragma: no cover
                 brim_width=cool_brim_width if cool_enable_brim else None,
                 brim_separation=cool_brim_sep if cool_enable_brim else None,
             )
-            with st.spinner("Running cooling test pipeline..."):
+            with st.spinner(_("Running cooling test pipeline...")):
                 success, log, estimate = run_pipeline(cooling_run, args)
             st.session_state["_last_run"] = {
                 "output_dir": run_dir,
@@ -3759,9 +3767,9 @@ def _show_results(
     tab_id = run_info.get("tab", "default")
 
     if success:
-        st.success("Pipeline completed!")
+        st.success(_("Pipeline completed!"))
     else:
-        st.error("Pipeline failed!")
+        st.error(_("Pipeline failed!"))
 
     # Download button
     gcode_path = find_output_file(output_dir, ascii_gcode)
@@ -3804,7 +3812,7 @@ def _show_results(
         _show_upload_section(st, run_info, gcode_path, tab_id)
 
     # Pipeline log
-    with st.expander("Pipeline Log", expanded=not success):
+    with st.expander(_("Pipeline Log"), expanded=not success):
         st.code(log)
 
 
@@ -3851,13 +3859,13 @@ def _show_upload_section(
                     st.session_state["_upload_status"] = "uploading"
                     st.rerun()
             with col_skip:
-                if st.button("Skip", key=f"skip_upload_{tab_id}"):
+                if st.button(_("Skip"), key=f"skip_upload_{tab_id}"):
                     st.session_state["_upload_status"] = "skipped"
                     st.rerun()
 
         elif upload_status == "uploading":
             # --- Upload in progress ---
-            with st.spinner("Uploading to printer\u2026"):
+            with st.spinner(_("Uploading to printer\u2026")):
                 ok, msg = upload_to_printer(
                     printer_url=run_info["printer_url"],
                     api_key=run_info["api_key"],
@@ -3885,12 +3893,12 @@ def _show_upload_section(
                     "_upload_message", "Upload failed."
                 )
             )
-            if st.button("Retry Upload", key="retry_upload"):
+            if st.button(_("Retry Upload"), key="retry_upload"):
                 st.session_state["_upload_status"] = "uploading"
                 st.rerun()
 
         elif upload_status == "skipped":
-            st.info("Upload skipped.")
+            st.info(_("Upload skipped."))
 
 
 # ---------------------------------------------------------------------------

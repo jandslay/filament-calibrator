@@ -1,0 +1,231 @@
+# Filament Calibrator GUI — Deutsche Übersetzung
+msgid ""
+msgstr ""
+"Project-Id-Version: filament-calibrator 0.1.0\n"
+"Language: de\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Filament Calibrator"
+msgstr "Filament-Kalibrator"
+
+msgid "Common Settings"
+msgstr "Allgemeine Einstellungen"
+
+msgid "Nozzle is a high-flow variant (sets F flag in M862.1)"
+msgstr "Düse ist eine High-Flow-Variante (setzt F-Flag in M862.1)"
+
+msgid "Nozzle is hardened/abrasive-resistant (sets A flag in M862.1)"
+msgstr "Düse ist gehärtet/verschleißfest (setzt A-Flag in M862.1)"
+
+msgid "Default is binary (.bgcode) with thumbnail previews"
+msgstr "Standard ist binär (.bgcode) mit Vorschaubildern"
+
+msgid "PrusaLink Upload"
+msgstr "PrusaLink-Upload"
+
+msgid "Advanced"
+msgstr "Erweitert"
+
+msgid "Leave empty for built-in defaults"
+msgstr "Leer lassen für interne Standardwerte"
+
+msgid "Browse for .ini config"
+msgstr "Nach .ini-Konfiguration suchen"
+
+msgid "Auto-detect"
+msgstr "Automatisch erkennen"
+
+msgid "Browse for PrusaSlicer"
+msgstr "PrusaSlicer-Programm suchen"
+
+msgid "Auto (temp directory)"
+msgstr "Auto (temporäres Verzeichnis)"
+
+msgid "Browse for directory"
+msgstr "Verzeichnis auswählen"
+
+msgid "Workflow"
+msgstr "Arbeitsablauf"
+
+msgid "Temperature Tower"
+msgstr "Temperaturturm"
+
+msgid "Extrusion Multiplier"
+msgstr "Extrusionsmultiplikator"
+
+msgid "Retraction"
+msgstr "Retraktion"
+
+msgid "Pressure Advance"
+msgstr "Pressure Advance"
+
+msgid "Volumetric Flow"
+msgstr "Volumetrischer Durchfluss"
+
+msgid "Shrinkage & Tolerance"
+msgstr "Schwund & Toleranz"
+
+msgid "Bridging & Overhang"
+msgstr "Brücken & Überhänge"
+
+msgid "Cooling"
+msgstr "Kühlung"
+
+msgid "Guided Calibration Workflow"
+msgstr "Geführter Kalibrierungsablauf"
+
+msgid "{completed_count}/{total_count} steps completed"
+msgstr "{completed_count}/{total_count} Schritte abgeschlossen"
+
+msgid "Measured XY shrinkage. Compensation = 100 + this value."
+msgstr "Gemessener XY-Schwund. Kompensation = 100 + dieser Wert."
+
+msgid "Measured Z shrinkage. Compensation = 100 + this value."
+msgstr "Gemessener Z-Schwund. Kompensation = 100 + dieser Wert."
+
+msgid "Reset all results"
+msgstr "Alle Ergebnisse zurücksetzen"
+
+msgid "### Changes"
+msgstr "### Änderungen"
+
+msgid "### File Management"
+msgstr "### Dateiverwaltung"
+
+msgid "No results file to export."
+msgstr "Keine Ergebnisdatei zum Exportieren."
+
+msgid "Save with backup"
+msgstr "Speichern mit Sicherung"
+
+msgid "No existing file to back up."
+msgstr "Keine vorhandene Datei zum Sichern."
+
+msgid "Results saved."
+msgstr "Ergebnisse gespeichert."
+
+msgid "Brand Label (top)"
+msgstr "Markenbeschriftung (oben)"
+
+msgid "Brand Label (bottom)"
+msgstr "Markenbeschriftung (unten)"
+
+msgid "{num_tiers} tiers: {start_temp}°C → {end_temp}°C"
+msgstr "{num_tiers} Stufen: {start_temp}°C → {end_temp}°C"
+
+msgid "Start temp must be higher than end temp."
+msgstr "Starttemperatur muss höher als Endtemperatur sein."
+
+msgid "Enable Brim"
+msgstr "Brim aktivieren"
+
+msgid "Generate Temperature Tower"
+msgstr "Temperaturturm generieren"
+
+msgid "Running temperature tower pipeline..."
+msgstr "Temperaturturm-Pipeline läuft..."
+
+msgid "Advanced Slicer Settings"
+msgstr "Erweiterte Slicer-Einstellungen"
+
+msgid "Expected wall thickness: {em_extrusion_width:.2f} mm"
+msgstr "Erwartete Wandstärke: {em_extrusion_width:.2f} mm"
+
+msgid "Generate EM Cube"
+msgstr "EM-Würfel generieren"
+
+msgid "Running extrusion multiplier pipeline..."
+msgstr "Extrusionsmultiplikator-Pipeline läuft..."
+
+msgid "Generate Retraction"
+msgstr "Retraktion generieren"
+
+msgid "Running retraction test pipeline..."
+msgstr "Retraktionstest-Pipeline läuft..."
+
+msgid "Generate Retraction Speed"
+msgstr "Retraktionsgeschwindigkeit generieren"
+
+msgid "Pattern Settings"
+msgstr "Mustereinstellungen"
+
+msgid "Generate PA Calibration"
+msgstr "PA-Kalibrierung generieren"
+
+msgid "Running pressure advance pipeline..."
+msgstr "Pressure-Advance-Pipeline läuft..."
+
+msgid "Generate Flow Specimen"
+msgstr "Fluss-Prüfkörper generieren"
+
+msgid "Running volumetric flow pipeline..."
+msgstr "Volumetrische-Fluss-Pipeline läuft..."
+
+msgid "Shrinkage Test"
+msgstr "Schwundtest"
+
+msgid "Generate Shrinkage Cross"
+msgstr "Schwundkreuz generieren"
+
+msgid "Running shrinkage test pipeline..."
+msgstr "Schwundtest-Pipeline läuft..."
+
+msgid "Tolerance Test"
+msgstr "Toleranztest"
+
+msgid "Generate Tolerance Test"
+msgstr "Toleranztest generieren"
+
+msgid "Running tolerance test pipeline..."
+msgstr "Toleranztest-Pipeline läuft..."
+
+msgid "Bridging Test"
+msgstr "Brückentest"
+
+msgid "Generate Bridging Test"
+msgstr "Brückentest generieren"
+
+msgid "Running bridging test pipeline..."
+msgstr "Brückentest-Pipeline läuft..."
+
+msgid "Overhang Test"
+msgstr "Überhangtest"
+
+msgid "Generate Overhang Test"
+msgstr "Überhangtest generieren"
+
+msgid "Running overhang test pipeline..."
+msgstr "Überhangtest-Pipeline läuft..."
+
+msgid "Cooling Test"
+msgstr "Kühltest"
+
+msgid "Generate Cooling Test"
+msgstr "Kühltest generieren"
+
+msgid "Running cooling test pipeline..."
+msgstr "Kühltest-Pipeline läuft..."
+
+msgid "Pipeline completed!"
+msgstr "Pipeline abgeschlossen!"
+
+msgid "Pipeline failed!"
+msgstr "Pipeline fehlgeschlagen!"
+
+msgid "Pipeline Log"
+msgstr "Pipeline-Protokoll"
+
+msgid "Skip"
+msgstr "Überspringen"
+
+msgid "Uploading to printer…"
+msgstr "Wird an Drucker gesendet…"
+
+msgid "Retry Upload"
+msgstr "Upload wiederholen"
+
+msgid "Upload skipped."
+msgstr "Upload übersprungen."
+
