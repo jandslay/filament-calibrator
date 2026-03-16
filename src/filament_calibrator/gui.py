@@ -699,8 +699,6 @@ def _win32_file_dialog(
 
         # OPENFILENAMEW structure
         buf = ctypes.create_unicode_buffer(4096)
-        ofn_size = 76 + ctypes.sizeof(ctypes.c_void_p) * 10
-        # Use a simpler approach: just fill the struct manually
         class OPENFILENAME(ctypes.Structure):
             _fields_ = [
                 ("lStructSize", ctypes.wintypes.DWORD),
@@ -844,6 +842,14 @@ def apply_toml_to_session(
 # ---------------------------------------------------------------------------
 
 
+#: Session-state key prefixes for tool tabs (excludes temperature tower
+#: which uses ``tt_`` with a different key layout).
+_TAB_PREFIXES: List[str] = [
+    "em", "flow", "pa", "retraction", "shrinkage",
+    "rs", "tol", "br", "oh", "cool",
+]
+
+
 def snap_nozzle_size(diameter: float) -> float:
     """Snap *diameter* to the nearest value in :data:`_NOZZLE_SIZES`."""
     return min(_NOZZLE_SIZES, key=lambda s: abs(s - diameter))
@@ -870,16 +876,8 @@ def apply_ini_to_session(
     """
     if "nozzle_temp" in ini_vals:
         nt = ini_vals["nozzle_temp"]
-        state["em_nozzle_temp"] = nt
-        state["flow_nozzle_temp"] = nt
-        state["pa_nozzle_temp"] = nt
-        state["retraction_nozzle_temp"] = nt
-        state["shrinkage_nozzle_temp"] = nt
-        state["rs_nozzle_temp"] = nt
-        state["tol_nozzle_temp"] = nt
-        state["br_nozzle_temp"] = nt
-        state["oh_nozzle_temp"] = nt
-        state["cool_nozzle_temp"] = nt
+        for pfx in _TAB_PREFIXES:
+            state[f"{pfx}_nozzle_temp"] = nt
         # Derive a temp tower range centred on the INI temperature.
         state["tt_start_temp"] = nt + 15
         state["tt_end_temp"] = nt - 15
@@ -887,56 +885,24 @@ def apply_ini_to_session(
     if "bed_temp" in ini_vals:
         bt = ini_vals["bed_temp"]
         state["tt_bed_temp"] = bt
-        state["em_bed_temp"] = bt
-        state["flow_bed_temp"] = bt
-        state["pa_bed_temp"] = bt
-        state["retraction_bed_temp"] = bt
-        state["shrinkage_bed_temp"] = bt
-        state["rs_bed_temp"] = bt
-        state["tol_bed_temp"] = bt
-        state["br_bed_temp"] = bt
-        state["oh_bed_temp"] = bt
-        state["cool_bed_temp"] = bt
+        for pfx in _TAB_PREFIXES:
+            state[f"{pfx}_bed_temp"] = bt
 
     if "fan_speed" in ini_vals:
         fs = ini_vals["fan_speed"]
         state["tt_fan"] = fs
-        state["em_fan"] = fs
-        state["flow_fan"] = fs
-        state["pa_fan"] = fs
-        state["retraction_fan"] = fs
-        state["shrinkage_fan"] = fs
-        state["rs_fan"] = fs
-        state["tol_fan"] = fs
-        state["br_fan"] = fs
-        state["oh_fan"] = fs
-        state["cool_fan_speed"] = fs
+        for pfx in _TAB_PREFIXES:
+            state[f"{pfx}_fan"] = fs
 
     if "layer_height" in ini_vals:
         lh = ini_vals["layer_height"]
-        state["em_lh"] = lh
-        state["flow_lh"] = lh
-        state["pa_lh"] = lh
-        state["retraction_lh"] = lh
-        state["shrinkage_lh"] = lh
-        state["rs_lh"] = lh
-        state["tol_lh"] = lh
-        state["br_lh"] = lh
-        state["oh_lh"] = lh
-        state["cool_lh"] = lh
+        for pfx in _TAB_PREFIXES:
+            state[f"{pfx}_lh"] = lh
 
     if "extrusion_width" in ini_vals:
         ew = ini_vals["extrusion_width"]
-        state["em_ew"] = ew
-        state["flow_ew"] = ew
-        state["pa_ew"] = ew
-        state["retraction_ew"] = ew
-        state["shrinkage_ew"] = ew
-        state["rs_ew"] = ew
-        state["tol_ew"] = ew
-        state["br_ew"] = ew
-        state["oh_ew"] = ew
-        state["cool_ew"] = ew
+        for pfx in _TAB_PREFIXES:
+            state[f"{pfx}_ew"] = ew
 
     if sidebar and "nozzle_diameter" in ini_vals:
         snapped = snap_nozzle_size(ini_vals["nozzle_diameter"])
@@ -1361,6 +1327,91 @@ def import_results_from_json(
 
 
 # ---------------------------------------------------------------------------
+# G-code toolpath preview rendering
+# ---------------------------------------------------------------------------
+
+
+#: Inline Python script executed in a subprocess by
+#: :func:`render_gcode_preview`.  VTK's Cocoa backend (macOS) requires
+#: ``NSWindow`` creation on the main thread, but Streamlit runs the app
+#: script on a background thread.  Spawning a fresh process guarantees
+#: that PyVista/VTK gets its own main thread.
+_RENDER_SCRIPT = """\
+import sys
+gcode_path, out_path, w, h = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
+import pyvista as pv
+from gcode_viewer.extractor import extract_toolpath
+from gcode_viewer.renderer import build_scene
+from gcode_viewer.camera import CAMERA_PRESETS
+from gcode_viewer.types import ColorMode
+toolpath = extract_toolpath(gcode_path)
+plotter = pv.Plotter(off_screen=True, window_size=[w, h])
+build_scene(plotter, toolpath,
+            layer_range=(0, toolpath.total_layers - 1),
+            show_travel=False, show_bed=True,
+            color_mode=ColorMode.FEATURE_TYPE)
+plotter.camera_position = CAMERA_PRESETS["isometric"](toolpath)
+plotter.screenshot(out_path)
+plotter.close()
+"""
+
+
+def render_gcode_preview(
+    gcode_path: str,
+    width: int = 440,
+    height: int = 248,
+) -> Optional[bytes]:
+    """Render a G-code file to a PNG image using *gcode-viewer*.
+
+    The rendering runs in a **subprocess** because VTK's Cocoa backend
+    on macOS requires ``NSWindow`` creation on the main thread, but
+    Streamlit executes the app script on a background thread.
+
+    Returns the PNG data as ``bytes``, or ``None`` when the
+    *gcode-viewer* package is not installed, the render subprocess
+    fails, or we are running inside a PyInstaller frozen bundle
+    (where ``sys.executable`` is the frozen binary, not Python).
+    """
+    if _is_frozen():
+        return None
+
+    try:
+        import gcode_viewer as _gv  # noqa: F401 — availability check
+    except ImportError:
+        return None
+
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+        tmp_path = tmp.name
+
+    try:
+        proc = subprocess.run(
+            [
+                sys.executable, "-c", _RENDER_SCRIPT,
+                gcode_path, tmp_path, str(width), str(height),
+            ],
+            capture_output=True,
+            timeout=120,
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        Path(tmp_path).unlink(missing_ok=True)
+        return None
+
+    png_path = Path(tmp_path)
+    if (
+        proc.returncode == 0
+        and png_path.exists()
+        and png_path.stat().st_size > 0
+    ):
+        png_data = png_path.read_bytes()
+        png_path.unlink(missing_ok=True)
+        return png_data
+    png_path.unlink(missing_ok=True)
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Streamlit app (only imported when actually running the GUI)
 # ---------------------------------------------------------------------------
 
@@ -1379,6 +1430,32 @@ def _app() -> None:  # pragma: no cover
     from filament_calibrator.retraction_speed_cli import run as retraction_speed_run
     from filament_calibrator.shrinkage_cli import run as shrinkage_run
     from filament_calibrator.tolerance_cli import run as tolerance_run
+
+    def _brim_controls(
+        prefix: str,
+    ) -> Tuple[bool, float, float]:
+        """Render checkbox + width/separation inputs for brim settings.
+
+        Returns ``(enabled, width, separation)`` so the caller can pass
+        ``width if enabled else None`` to the pipeline builder.
+        """
+        enabled = st.checkbox("Enable Brim", key=f"{prefix}_enable_brim")
+        _bc1, _bc2 = st.columns(2)
+        with _bc1:
+            width = st.number_input(
+                "Brim Width (mm)",
+                value=5.0, min_value=0.0, max_value=20.0,
+                step=1.0, format="%.1f", key=f"{prefix}_brim_width",
+                disabled=not enabled,
+            )
+        with _bc2:
+            sep = st.number_input(
+                "Brim Separation (mm)",
+                value=0.50, min_value=0.0, max_value=2.0,
+                step=0.05, format="%.2f", key=f"{prefix}_brim_sep",
+                disabled=not enabled,
+            )
+        return enabled, width, sep
 
     st.set_page_config(
         page_title="Filament Calibrator",
@@ -1476,6 +1553,14 @@ def _app() -> None:  # pragma: no cover
             options=_PRINTER_LIST,
             key="sidebar_printer",
         )
+
+        # Enclosure warning for filaments that benefit from it,
+        # unless the printer has a built-in enclosure.
+        if preset["enclosure"] and printer not in ("COREONE", "COREONEL"):
+            st.info(
+                f"{filament_type} benefits from an enclosed printer. "
+                "Consider using an enclosure for best results."
+            )
 
         nozzle_size = st.selectbox(
             "Nozzle Size (mm)",
@@ -1602,62 +1687,20 @@ def _app() -> None:  # pragma: no cover
         st.session_state["_preset_filament_type"] = filament_type
         st.session_state["_preset_nozzle_size"] = nozzle_size
 
-    _widget_defaults = {
+    # Temperature tower has a unique key layout.
+    _widget_defaults: Dict[str, Any] = {
         "tt_start_temp": preset["temp_max"],
         "tt_end_temp": preset["temp_min"],
         "tt_bed_temp": preset["bed"],
         "tt_fan": preset["fan"],
-        "em_nozzle_temp": preset["hotend"],
-        "em_bed_temp": preset["bed"],
-        "em_fan": preset["fan"],
-        "em_lh": derived_lh,
-        "em_ew": derived_ew,
-        "flow_nozzle_temp": preset["hotend"],
-        "flow_bed_temp": preset["bed"],
-        "flow_fan": preset["fan"],
-        "flow_lh": derived_lh,
-        "flow_ew": derived_ew,
-        "pa_nozzle_temp": preset["hotend"],
-        "pa_bed_temp": preset["bed"],
-        "pa_fan": preset["fan"],
-        "pa_lh": derived_lh,
-        "pa_ew": derived_ew,
-        "retraction_nozzle_temp": preset["hotend"],
-        "retraction_bed_temp": preset["bed"],
-        "retraction_fan": preset["fan"],
-        "retraction_lh": derived_lh,
-        "retraction_ew": derived_ew,
-        "shrinkage_nozzle_temp": preset["hotend"],
-        "shrinkage_bed_temp": preset["bed"],
-        "shrinkage_fan": preset["fan"],
-        "shrinkage_lh": derived_lh,
-        "shrinkage_ew": derived_ew,
-        "rs_nozzle_temp": preset["hotend"],
-        "rs_bed_temp": preset["bed"],
-        "rs_fan": preset["fan"],
-        "rs_lh": derived_lh,
-        "rs_ew": derived_ew,
-        "tol_nozzle_temp": preset["hotend"],
-        "tol_bed_temp": preset["bed"],
-        "tol_fan": preset["fan"],
-        "tol_lh": derived_lh,
-        "tol_ew": derived_ew,
-        "br_nozzle_temp": preset["hotend"],
-        "br_bed_temp": preset["bed"],
-        "br_fan": preset["fan"],
-        "br_lh": derived_lh,
-        "br_ew": derived_ew,
-        "oh_nozzle_temp": preset["hotend"],
-        "oh_bed_temp": preset["bed"],
-        "oh_fan": preset["fan"],
-        "oh_lh": derived_lh,
-        "oh_ew": derived_ew,
-        "cool_nozzle_temp": preset["hotend"],
-        "cool_bed_temp": preset["bed"],
-        "cool_fan_speed": preset["fan"],
-        "cool_lh": derived_lh,
-        "cool_ew": derived_ew,
     }
+    # All other tabs follow a regular pattern.
+    for _pfx in _TAB_PREFIXES:
+        _widget_defaults[f"{_pfx}_nozzle_temp"] = preset["hotend"]
+        _widget_defaults[f"{_pfx}_bed_temp"] = preset["bed"]
+        _widget_defaults[f"{_pfx}_fan"] = preset["fan"]
+        _widget_defaults[f"{_pfx}_lh"] = derived_lh
+        _widget_defaults[f"{_pfx}_ew"] = derived_ew
     for _wk, _wv in _widget_defaults.items():
         if _wk not in st.session_state or _defaults_changed:
             st.session_state[_wk] = _wv
@@ -1880,24 +1923,27 @@ def _app() -> None:  # pragma: no cover
             printer=printer,
         )
 
-        # Auto-save results for this filament/nozzle/printer combo.
-        save_results(
-            filament_type, nozzle_size, printer,
-            results_to_dict(
-                set_temp=set_temp, temperature=int(res_temp),
-                set_em=set_em, extrusion_multiplier=float(res_em),
-                set_retraction=set_retraction,
-                retraction_length=float(res_retraction),
-                set_retraction_speed=set_retraction_speed,
-                retraction_speed=float(res_retraction_speed),
-                set_pa=set_pa, pa_value=float(res_pa),
-                set_flow=set_flow,
-                max_volumetric_speed=float(res_flow),
-                set_shrinkage=set_shrinkage,
-                xy_shrinkage=float(res_xy_shrinkage),
-                z_shrinkage=float(res_z_shrinkage),
-            ),
+        # Build the results dict once — reused for auto-save and backup.
+        _results_dict = results_to_dict(
+            set_temp=set_temp, temperature=int(res_temp),
+            set_em=set_em, extrusion_multiplier=float(res_em),
+            set_retraction=set_retraction,
+            retraction_length=float(res_retraction),
+            set_retraction_speed=set_retraction_speed,
+            retraction_speed=float(res_retraction_speed),
+            set_pa=set_pa, pa_value=float(res_pa),
+            set_flow=set_flow,
+            max_volumetric_speed=float(res_flow),
+            set_shrinkage=set_shrinkage,
+            xy_shrinkage=float(res_xy_shrinkage),
+            z_shrinkage=float(res_z_shrinkage),
         )
+
+        # Auto-save only when values have actually changed.
+        _prev_saved = st.session_state.get("_prev_results_dict")
+        if _results_dict != _prev_saved:
+            save_results(filament_type, nozzle_size, printer, _results_dict)
+            st.session_state["_prev_results_dict"] = _results_dict
 
         # Show change summary
         has_any = (
@@ -1985,23 +2031,7 @@ def _app() -> None:  # pragma: no cover
                 else:
                     st.info(_("No existing file to back up."))
                 save_results(
-                    filament_type, nozzle_size, printer,
-                    results_to_dict(
-                        set_temp=set_temp,
-                        temperature=int(res_temp),
-                        set_em=set_em,
-                        extrusion_multiplier=float(res_em),
-                        set_retraction=set_retraction,
-                        retraction_length=float(res_retraction),
-                        set_retraction_speed=set_retraction_speed,
-                        retraction_speed=float(res_retraction_speed),
-                        set_pa=set_pa, pa_value=float(res_pa),
-                        set_flow=set_flow,
-                        max_volumetric_speed=float(res_flow),
-                        set_shrinkage=set_shrinkage,
-                        xy_shrinkage=float(res_xy_shrinkage),
-                        z_shrinkage=float(res_z_shrinkage),
-                    ),
+                    filament_type, nozzle_size, printer, _results_dict,
                 )
                 st.success(_("Results saved."))
 
@@ -2064,31 +2094,17 @@ def _app() -> None:  # pragma: no cover
 
         # Tier count preview
         spread = start_temp - end_temp
+        _tt_params_invalid = spread <= 0
         if spread > 0 and temp_step > 0 and spread % temp_step == 0:
             num_tiers = spread // temp_step + 1
-            st.info(_("{num_tiers} tiers: {start_temp}\u00b0C \u2192 {end_temp}\u00b0C").format(num_tiers=num_tiers, start_temp=start_temp, end_temp=end_temp))
-        elif spread <= 0:
+            st.info(f_("{num_tiers} tiers: {start_temp}\u00b0C \u2192 {end_temp}\u00b0C"))
+        elif _tt_params_invalid:
             st.warning(_("Start temp must be higher than end temp."))
 
-        tt_enable_brim = st.checkbox(_("Enable Brim"), key="tt_enable_brim")
-        _bc1, _bc2 = st.columns(2)
-        with _bc1:
-            tt_brim_width = st.number_input(
-                "Brim Width (mm)",
-                value=5.0, min_value=0.0, max_value=20.0,
-                step=1.0, format="%.1f", key="tt_brim_width",
-                disabled=not tt_enable_brim,
-            )
-        with _bc2:
-            tt_brim_sep = st.number_input(
-                "Brim Separation (mm)",
-                value=0.50, min_value=0.0, max_value=2.0,
-                step=0.05, format="%.2f", key="tt_brim_sep",
-                disabled=not tt_enable_brim,
-            )
+        tt_enable_brim, tt_brim_width, tt_brim_sep = _brim_controls("tt")
 
         if st.button(_("Generate Temperature Tower"), type="primary",
-                      key="run_temp"):
+                      key="run_temp", disabled=_tt_params_invalid):
             _temp_err = _check_printer_temps(printer, start_temp, tt_bed_temp)
             if _temp_err:
                 st.error(_temp_err)
@@ -2172,22 +2188,7 @@ def _app() -> None:  # pragma: no cover
                 key="em_fan",
             )
 
-        em_enable_brim = st.checkbox(_("Enable Brim"), key="em_enable_brim")
-        _bc1, _bc2 = st.columns(2)
-        with _bc1:
-            em_brim_width = st.number_input(
-                "Brim Width (mm)",
-                value=5.0, min_value=0.0, max_value=20.0,
-                step=1.0, format="%.1f", key="em_brim_width",
-                disabled=not em_enable_brim,
-            )
-        with _bc2:
-            em_brim_sep = st.number_input(
-                "Brim Separation (mm)",
-                value=0.50, min_value=0.0, max_value=2.0,
-                step=0.05, format="%.2f", key="em_brim_sep",
-                disabled=not em_enable_brim,
-            )
+        em_enable_brim, em_brim_width, em_brim_sep = _brim_controls("em")
 
         with st.expander(_("Advanced Slicer Settings")):
             em_cube_size = st.number_input(
@@ -2337,24 +2338,9 @@ def _app() -> None:  # pragma: no cover
                     key="retraction_fan",
                 )
 
-            retraction_enable_brim = st.checkbox(
-                "Enable Brim", key="retraction_enable_brim",
+            retraction_enable_brim, retraction_brim_width, retraction_brim_sep = (
+                _brim_controls("retraction")
             )
-            _bc1, _bc2 = st.columns(2)
-            with _bc1:
-                retraction_brim_width = st.number_input(
-                    "Brim Width (mm)",
-                    value=5.0, min_value=0.0, max_value=20.0,
-                    step=1.0, format="%.1f", key="retraction_brim_width",
-                    disabled=not retraction_enable_brim,
-                )
-            with _bc2:
-                retraction_brim_sep = st.number_input(
-                    "Brim Separation (mm)",
-                    value=0.50, min_value=0.0, max_value=2.0,
-                    step=0.05, format="%.2f", key="retraction_brim_sep",
-                    disabled=not retraction_enable_brim,
-                )
 
             retraction_level_height = 1.0
             with st.expander(_("Advanced Slicer Settings")):
@@ -2381,7 +2367,8 @@ def _app() -> None:  # pragma: no cover
                 )
 
             # Level count preview
-            if end_retraction > start_retraction and retraction_step_val > 0:
+            _ret_params_invalid = end_retraction <= start_retraction
+            if not _ret_params_invalid and retraction_step_val > 0:
                 num_levels = (
                     round(
                         (end_retraction - start_retraction)
@@ -2395,7 +2382,8 @@ def _app() -> None:  # pragma: no cover
                 )
 
             if st.button(_("Generate Retraction"), type="primary",
-                          key="run_retraction"):
+                          key="run_retraction",
+                          disabled=_ret_params_invalid):
                 _temp_err = _check_printer_temps(
                     printer, retraction_nozzle_temp, retraction_bed_temp,
                 )
@@ -2520,24 +2508,9 @@ def _app() -> None:  # pragma: no cover
                     key="rs_fan",
                 )
 
-            rs_enable_brim = st.checkbox(
-                "Enable Brim", key="rs_enable_brim",
+            rs_enable_brim, rs_brim_width, rs_brim_sep = (
+                _brim_controls("rs")
             )
-            _bc1, _bc2 = st.columns(2)
-            with _bc1:
-                rs_brim_width = st.number_input(
-                    "Brim Width (mm)",
-                    value=5.0, min_value=0.0, max_value=20.0,
-                    step=1.0, format="%.1f", key="rs_brim_width",
-                    disabled=not rs_enable_brim,
-                )
-            with _bc2:
-                rs_brim_sep = st.number_input(
-                    "Brim Separation (mm)",
-                    value=0.50, min_value=0.0, max_value=2.0,
-                    step=0.05, format="%.2f", key="rs_brim_sep",
-                    disabled=not rs_enable_brim,
-                )
 
             rs_level_height = 1.0
             with st.expander(_("Advanced Slicer Settings")):
@@ -2576,8 +2549,10 @@ def _app() -> None:  # pragma: no cover
                     f"{rs_start_speed:.1f} \u2192 {rs_end_speed:.1f} mm/s"
                 )
 
+            _rs_params_invalid = rs_end_speed <= rs_start_speed
             if st.button(_("Generate Retraction Speed"),
-                          type="primary", key="run_retraction_speed"):
+                          type="primary", key="run_retraction_speed",
+                          disabled=_rs_params_invalid):
                 _temp_err = _check_printer_temps(
                     printer, rs_nozzle_temp, rs_bed_temp,
                 )
@@ -2716,22 +2691,7 @@ def _app() -> None:  # pragma: no cover
                 key="pa_fan",
             )
 
-        pa_enable_brim = st.checkbox(_("Enable Brim"), key="pa_enable_brim")
-        _bc1, _bc2 = st.columns(2)
-        with _bc1:
-            pa_brim_width = st.number_input(
-                "Brim Width (mm)",
-                value=5.0, min_value=0.0, max_value=20.0,
-                step=1.0, format="%.1f", key="pa_brim_width",
-                disabled=not pa_enable_brim,
-            )
-        with _bc2:
-            pa_brim_sep = st.number_input(
-                "Brim Separation (mm)",
-                value=0.50, min_value=0.0, max_value=2.0,
-                step=0.05, format="%.2f", key="pa_brim_sep",
-                disabled=not pa_enable_brim,
-            )
+        pa_enable_brim, pa_brim_width, pa_brim_sep = _brim_controls("pa")
 
         # Pattern-specific settings (defaults used when method is tower)
         pa_corner_angle = 90.0
@@ -2828,8 +2788,9 @@ def _app() -> None:  # pragma: no cover
                 f"PA {start_pa:.4f} \u2192 {end_pa:.4f}"
             )
 
+        _pa_params_invalid = end_pa <= start_pa
         if st.button(_("Generate PA Calibration"), type="primary",
-                      key="run_pa"):
+                      key="run_pa", disabled=_pa_params_invalid):
             _temp_err = _check_printer_temps(
                 printer, pa_nozzle_temp, pa_bed_temp,
             )
@@ -2953,22 +2914,7 @@ def _app() -> None:  # pragma: no cover
                 key="flow_fan",
             )
 
-        flow_enable_brim = st.checkbox(_("Enable Brim"), key="flow_enable_brim")
-        _bc1, _bc2 = st.columns(2)
-        with _bc1:
-            flow_brim_width = st.number_input(
-                "Brim Width (mm)",
-                value=5.0, min_value=0.0, max_value=20.0,
-                step=1.0, format="%.1f", key="flow_brim_width",
-                disabled=not flow_enable_brim,
-            )
-        with _bc2:
-            flow_brim_sep = st.number_input(
-                "Brim Separation (mm)",
-                value=0.50, min_value=0.0, max_value=2.0,
-                step=0.05, format="%.2f", key="flow_brim_sep",
-                disabled=not flow_enable_brim,
-            )
+        flow_enable_brim, flow_brim_width, flow_brim_sep = _brim_controls("flow")
 
         with st.expander(_("Advanced Slicer Settings")):
             flow_level_height = st.number_input(
@@ -3001,8 +2947,9 @@ def _app() -> None:  # pragma: no cover
                 f"{start_speed:.1f} \u2192 {end_speed:.1f} mm\u00b3/s"
             )
 
+        _flow_params_invalid = end_speed <= start_speed
         if st.button(_("Generate Flow Specimen"), type="primary",
-                      key="run_flow"):
+                      key="run_flow", disabled=_flow_params_invalid):
             _temp_err = _check_printer_temps(
                 printer, flow_nozzle_temp, flow_bed_temp,
             )
@@ -3090,24 +3037,9 @@ def _app() -> None:  # pragma: no cover
                 key="shrinkage_fan",
             )
 
-        shrinkage_enable_brim = st.checkbox(
-            "Enable Brim", key="shrinkage_enable_brim",
+        shrinkage_enable_brim, shrinkage_brim_width, shrinkage_brim_sep = (
+            _brim_controls("shrinkage")
         )
-        _bc1, _bc2 = st.columns(2)
-        with _bc1:
-            shrinkage_brim_width = st.number_input(
-                "Brim Width (mm)",
-                value=5.0, min_value=0.0, max_value=20.0,
-                step=1.0, format="%.1f", key="shrinkage_brim_width",
-                disabled=not shrinkage_enable_brim,
-            )
-        with _bc2:
-            shrinkage_brim_sep = st.number_input(
-                "Brim Separation (mm)",
-                value=0.50, min_value=0.0, max_value=2.0,
-                step=0.05, format="%.2f", key="shrinkage_brim_sep",
-                disabled=not shrinkage_enable_brim,
-            )
 
         with st.expander(_("Advanced Slicer Settings")):
             shrinkage_arm_length = st.number_input(
@@ -3231,22 +3163,7 @@ def _app() -> None:  # pragma: no cover
                 key="tol_fan",
             )
 
-        tol_enable_brim = st.checkbox(_("Enable Brim"), key="tol_enable_brim")
-        _bc1, _bc2 = st.columns(2)
-        with _bc1:
-            tol_brim_width = st.number_input(
-                "Brim Width (mm)",
-                value=5.0, min_value=0.0, max_value=20.0,
-                step=1.0, format="%.1f", key="tol_brim_width",
-                disabled=not tol_enable_brim,
-            )
-        with _bc2:
-            tol_brim_sep = st.number_input(
-                "Brim Separation (mm)",
-                value=0.50, min_value=0.0, max_value=2.0,
-                step=0.05, format="%.2f", key="tol_brim_sep",
-                disabled=not tol_enable_brim,
-            )
+        tol_enable_brim, tol_brim_width, tol_brim_sep = _brim_controls("tol")
 
         with st.expander(_("Advanced Slicer Settings"),
                           key="tol_advanced"):
@@ -3366,22 +3283,7 @@ def _app() -> None:  # pragma: no cover
                 key="br_fan",
             )
 
-        br_enable_brim = st.checkbox(_("Enable Brim"), key="br_enable_brim")
-        _bc1, _bc2 = st.columns(2)
-        with _bc1:
-            br_brim_width = st.number_input(
-                "Brim Width (mm)",
-                value=5.0, min_value=0.0, max_value=20.0,
-                step=1.0, format="%.1f", key="br_brim_width",
-                disabled=not br_enable_brim,
-            )
-        with _bc2:
-            br_brim_sep = st.number_input(
-                "Brim Separation (mm)",
-                value=0.50, min_value=0.0, max_value=2.0,
-                step=0.05, format="%.2f", key="br_brim_sep",
-                disabled=not br_enable_brim,
-            )
+        br_enable_brim, br_brim_width, br_brim_sep = _brim_controls("br")
 
         with st.expander(_("Advanced Slicer Settings"),
                           key="br_advanced"):
@@ -3493,22 +3395,7 @@ def _app() -> None:  # pragma: no cover
                 key="oh_fan",
             )
 
-        oh_enable_brim = st.checkbox(_("Enable Brim"), key="oh_enable_brim")
-        _bc1, _bc2 = st.columns(2)
-        with _bc1:
-            oh_brim_width = st.number_input(
-                "Brim Width (mm)",
-                value=5.0, min_value=0.0, max_value=20.0,
-                step=1.0, format="%.1f", key="oh_brim_width",
-                disabled=not oh_enable_brim,
-            )
-        with _bc2:
-            oh_brim_sep = st.number_input(
-                "Brim Separation (mm)",
-                value=0.50, min_value=0.0, max_value=2.0,
-                step=0.05, format="%.2f", key="oh_brim_sep",
-                disabled=not oh_enable_brim,
-            )
+        oh_enable_brim, oh_brim_width, oh_brim_sep = _brim_controls("oh")
 
         with st.expander(_("Advanced Slicer Settings"),
                           key="oh_advanced"):
@@ -3634,29 +3521,14 @@ def _app() -> None:  # pragma: no cover
                 key="cool_bed_temp",
             )
         with col6:
-            cool_fan_speed = st.number_input(
+            cool_fan = st.number_input(
                 "Fan Speed (%)",
                 min_value=0,
                 max_value=100,
-                key="cool_fan_speed",
+                key="cool_fan",
             )
 
-        cool_enable_brim = st.checkbox(_("Enable Brim"), key="cool_enable_brim")
-        _bc1, _bc2 = st.columns(2)
-        with _bc1:
-            cool_brim_width = st.number_input(
-                "Brim Width (mm)",
-                value=5.0, min_value=0.0, max_value=20.0,
-                step=1.0, format="%.1f", key="cool_brim_width",
-                disabled=not cool_enable_brim,
-            )
-        with _bc2:
-            cool_brim_sep = st.number_input(
-                "Brim Separation (mm)",
-                value=0.50, min_value=0.0, max_value=2.0,
-                step=0.05, format="%.2f", key="cool_brim_sep",
-                disabled=not cool_enable_brim,
-            )
+        cool_enable_brim, cool_brim_width, cool_brim_sep = _brim_controls("cool")
 
         cool_level_height = 1.0
         with st.expander(_("Advanced Slicer Settings"),
@@ -3696,8 +3568,9 @@ def _app() -> None:  # pragma: no cover
                 f"{cool_start_fan}% \u2192 {cool_end_fan}%"
             )
 
+        _cool_params_invalid = cool_end_fan <= cool_start_fan
         if st.button(_("Generate Cooling Test"), type="primary",
-                      key="run_cooling"):
+                      key="run_cooling", disabled=_cool_params_invalid):
             _temp_err = _check_printer_temps(
                 printer, cool_nozzle_temp, cool_bed_temp,
             )
@@ -3713,7 +3586,7 @@ def _app() -> None:  # pragma: no cover
                 level_height=cool_level_height,
                 nozzle_temp=cool_nozzle_temp,
                 bed_temp=cool_bed_temp,
-                fan_speed=cool_fan_speed,
+                fan_speed=cool_fan,
                 nozzle_size=nozzle_size,
                 nozzle_high_flow=nozzle_high_flow,
                 nozzle_hardened=nozzle_hardened,
@@ -3783,25 +3656,38 @@ def _show_results(
                 key=f"download_gcode_{tab_id}",
             )
 
-    # Thumbnail preview (use most recent STL for shared output dirs).
-    # Cache the rendered PNG in session state so the media-file ID stays
-    # stable across Streamlit reruns (avoids "Missing file" errors).
-    stl_files = list(Path(output_dir).glob("*.stl"))
-    if stl_files:
-        newest_stl = max(stl_files, key=lambda f: f.stat().st_mtime)
-        stl_key = str(newest_stl)
-        cached = st.session_state.get("_thumbnail_stl")
-        if cached == stl_key:
-            png_data = st.session_state.get("_thumbnail_png")
-        else:
-            try:
-                png_data = gl.render_stl_to_png(str(newest_stl), 440, 248)
-                st.session_state["_thumbnail_stl"] = stl_key
-                st.session_state["_thumbnail_png"] = png_data
-            except Exception:
-                png_data = None
-        if png_data is not None:
-            st.image(png_data, caption="Model Preview", width=440)
+    # Toolpath preview — render from the final G-code so the image
+    # shows actual slicer output (perimeters, infill, travel, etc.)
+    # instead of a plain STL solid.  Falls back to the legacy STL
+    # renderer when *gcode-viewer* is not installed.
+    # Cache the rendered PNG in session state so the media-file ID
+    # stays stable across Streamlit reruns (avoids "Missing file"
+    # errors).
+    _preview_source = str(gcode_path) if gcode_path is not None else ""
+    _cached_src = st.session_state.get("_preview_source")
+    if _preview_source and _cached_src == _preview_source:
+        png_data = st.session_state.get("_preview_png")
+    elif _preview_source:
+        png_data = render_gcode_preview(_preview_source)
+        if png_data is None:
+            # Fallback: render from STL if gcode-viewer unavailable
+            stl_files = list(Path(output_dir).glob("*.stl"))
+            if stl_files:
+                newest_stl = max(
+                    stl_files, key=lambda f: f.stat().st_mtime,
+                )
+                try:
+                    png_data = gl.render_stl_to_png(
+                        str(newest_stl), 440, 248,
+                    )
+                except Exception:
+                    png_data = None
+        st.session_state["_preview_source"] = _preview_source
+        st.session_state["_preview_png"] = png_data
+    else:
+        png_data = None
+    if png_data is not None:
+        st.image(png_data, caption="Toolpath Preview", width=440)
 
     # Upload section (only when pipeline succeeded and upload is configured)
     if (

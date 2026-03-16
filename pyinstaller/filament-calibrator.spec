@@ -18,6 +18,8 @@ a = Analysis(
         # PyInstaller compiles modules to .pyc in the PYZ archive, so we
         # must include gui.py as a data file for Streamlit to find it.
         ("../src/filament_calibrator/gui.py", "filament_calibrator"),
+        # Quick-start guide bundled at the top level of the distribution.
+        ("../QUICKSTART.md", "."),
     ],
     hiddenimports=[
         # --- filament_calibrator package ---
@@ -57,6 +59,12 @@ a = Analysis(
         "filament_calibrator.ini_writer",
         # --- external ---
         "gcode_lib",
+        "gcode_viewer",
+        "gcode_viewer.extractor",
+        "gcode_viewer.renderer",
+        "gcode_viewer.camera",
+        "gcode_viewer.types",
+        "pyvista",
         "streamlit",
     ],
     hookspath=[],
@@ -93,7 +101,7 @@ def _to_3_tuples(entries, typecode):
 
 
 # Collect data files and binaries for packages with native/static assets.
-for pkg in ("streamlit", "cadquery", "OCP", "gcode_lib"):
+for pkg in ("streamlit", "cadquery", "OCP", "gcode_lib", "gcode_viewer", "pyvista"):
     try:
         datas, binaries, hiddenimports = collect_all(pkg)
         a.datas += _to_3_tuples(datas, "DATA")
@@ -106,7 +114,7 @@ for pkg in ("streamlit", "cadquery", "OCP", "gcode_lib"):
 # importlib.metadata at runtime (e.g. streamlit reads its own version).
 # The runtime fallback in gui_entry.py handles the case where metadata
 # still isn't found (e.g. editable installs in CI).
-for pkg in ("streamlit", "filament-calibrator", "gcode-lib"):
+for pkg in ("streamlit", "filament-calibrator", "gcode-lib", "gcode-viewer"):
     try:
         a.datas += _to_3_tuples(copy_metadata(pkg), "DATA")
     except Exception:
