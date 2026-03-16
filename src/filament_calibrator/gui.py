@@ -1319,6 +1319,62 @@ def import_results_from_json(
 
 
 # ---------------------------------------------------------------------------
+# G-code toolpath preview rendering
+# ---------------------------------------------------------------------------
+
+
+def render_gcode_preview(
+    gcode_path: str,
+    width: int = 440,
+    height: int = 248,
+) -> Optional[bytes]:
+    """Render a G-code file to a PNG image using *gcode-viewer*.
+
+    Returns the PNG data as ``bytes``, or ``None`` when the
+    *gcode-viewer* package is not installed or rendering fails.
+    """
+    try:
+        import pyvista as pv
+
+        from gcode_viewer.camera import CAMERA_PRESETS
+        from gcode_viewer.extractor import extract_toolpath
+        from gcode_viewer.renderer import build_scene
+        from gcode_viewer.types import ColorMode
+    except ImportError:
+        return None
+
+    try:
+        toolpath = extract_toolpath(gcode_path)
+
+        plotter = pv.Plotter(off_screen=True, window_size=[width, height])
+        build_scene(
+            plotter,
+            toolpath,
+            layer_range=(0, toolpath.total_layers - 1),
+            show_travel=False,
+            show_bed=True,
+            color_mode=ColorMode.FEATURE_TYPE,
+        )
+        plotter.camera_position = CAMERA_PRESETS["isometric"](toolpath)
+
+        # plotter.screenshot() returns an ndarray; write to bytes via
+        # the temporary-file overload and read back.
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+            tmp_path = tmp.name
+        plotter.screenshot(tmp_path)
+        plotter.close()
+
+        png_path = Path(tmp_path)
+        png_data = png_path.read_bytes()
+        png_path.unlink(missing_ok=True)
+        return png_data
+    except Exception:
+        return None
+
+
+# ---------------------------------------------------------------------------
 # Streamlit app (only imported when actually running the GUI)
 # ---------------------------------------------------------------------------
 
@@ -3563,25 +3619,38 @@ def _show_results(
                 key=f"download_gcode_{tab_id}",
             )
 
-    # Thumbnail preview (use most recent STL for shared output dirs).
-    # Cache the rendered PNG in session state so the media-file ID stays
-    # stable across Streamlit reruns (avoids "Missing file" errors).
-    stl_files = list(Path(output_dir).glob("*.stl"))
-    if stl_files:
-        newest_stl = max(stl_files, key=lambda f: f.stat().st_mtime)
-        stl_key = str(newest_stl)
-        cached = st.session_state.get("_thumbnail_stl")
-        if cached == stl_key:
-            png_data = st.session_state.get("_thumbnail_png")
-        else:
-            try:
-                png_data = gl.render_stl_to_png(str(newest_stl), 440, 248)
-                st.session_state["_thumbnail_stl"] = stl_key
-                st.session_state["_thumbnail_png"] = png_data
-            except Exception:
-                png_data = None
-        if png_data is not None:
-            st.image(png_data, caption="Model Preview", width=440)
+    # Toolpath preview — render from the final G-code so the image
+    # shows actual slicer output (perimeters, infill, travel, etc.)
+    # instead of a plain STL solid.  Falls back to the legacy STL
+    # renderer when *gcode-viewer* is not installed.
+    # Cache the rendered PNG in session state so the media-file ID
+    # stays stable across Streamlit reruns (avoids "Missing file"
+    # errors).
+    _preview_source = str(gcode_path) if gcode_path is not None else ""
+    _cached_src = st.session_state.get("_preview_source")
+    if _preview_source and _cached_src == _preview_source:
+        png_data = st.session_state.get("_preview_png")
+    elif _preview_source:
+        png_data = render_gcode_preview(_preview_source)
+        if png_data is None:
+            # Fallback: render from STL if gcode-viewer unavailable
+            stl_files = list(Path(output_dir).glob("*.stl"))
+            if stl_files:
+                newest_stl = max(
+                    stl_files, key=lambda f: f.stat().st_mtime,
+                )
+                try:
+                    png_data = gl.render_stl_to_png(
+                        str(newest_stl), 440, 248,
+                    )
+                except Exception:
+                    png_data = None
+        st.session_state["_preview_source"] = _preview_source
+        st.session_state["_preview_png"] = png_data
+    else:
+        png_data = None
+    if png_data is not None:
+        st.image(png_data, caption="Toolpath Preview", width=440)
 
     # Upload section (only when pipeline succeeded and upload is configured)
     if (

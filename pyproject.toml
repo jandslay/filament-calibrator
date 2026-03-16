@@ -45,6 +45,7 @@ Documentation = "https://github.com/hyiger/filament-calibrator/tree/main/docs"
 [project.optional-dependencies]
 gui = [
     "streamlit>=1.28",
+    "gcode-viewer>=0.2.0",
 ]
 dev = [
     "pytest>=8.0",
