@@ -53,6 +53,7 @@ from filament_calibrator.gui import (
     build_tolerance_namespace,
     export_all_results,
     find_output_file,
+    render_gcode_preview,
     format_workflow_value,
     get_preset,
     get_workflow_status,
@@ -2344,3 +2345,91 @@ class TestTabPrefixes:
             assert state[f"{pfx}_fan"] == 80
             assert state[f"{pfx}_lh"] == 0.15
             assert state[f"{pfx}_ew"] == 0.45
+
+
+# ---------------------------------------------------------------------------
+# render_gcode_preview
+# ---------------------------------------------------------------------------
+
+
+def _install_gcode_viewer_stubs() -> Dict[str, MagicMock]:
+    """Inject mock ``gcode_viewer`` and ``pyvista`` into *sys.modules*.
+
+    Returns a dict of the mock modules keyed by name so tests can
+    configure return values on individual attributes.
+    """
+    mock_pv = MagicMock()
+    mock_gv = MagicMock()
+    mock_extractor = MagicMock()
+    mock_renderer = MagicMock()
+    mock_camera = MagicMock()
+    mock_types = MagicMock()
+    # ColorMode.FEATURE_TYPE must be a usable value
+    mock_types.ColorMode.FEATURE_TYPE = "FEATURE_TYPE"
+    mock_camera.CAMERA_PRESETS = {
+        "isometric": MagicMock(return_value="cam_pos"),
+    }
+    mods: Dict[str, MagicMock] = {
+        "pyvista": mock_pv,
+        "gcode_viewer": mock_gv,
+        "gcode_viewer.extractor": mock_extractor,
+        "gcode_viewer.renderer": mock_renderer,
+        "gcode_viewer.camera": mock_camera,
+        "gcode_viewer.types": mock_types,
+    }
+    return mods
+
+
+class TestRenderGcodePreview:
+    """Tests for the G-code toolpath preview renderer."""
+
+    def test_returns_none_when_gcode_viewer_missing(self) -> None:
+        """When gcode-viewer is not installed, return None gracefully."""
+        with patch.dict("sys.modules", {
+            "pyvista": None,
+            "gcode_viewer": None,
+            "gcode_viewer.extractor": None,
+            "gcode_viewer.renderer": None,
+            "gcode_viewer.camera": None,
+            "gcode_viewer.types": None,
+        }):
+            result = render_gcode_preview("/fake/model.gcode")
+            assert result is None
+
+    def test_returns_png_bytes_on_success(self) -> None:
+        """When rendering succeeds, return PNG bytes."""
+        fake_png = b"\x89PNG_FAKE_DATA"
+        mods = _install_gcode_viewer_stubs()
+
+        mock_toolpath = MagicMock()
+        mock_toolpath.total_layers = 10
+        mods["gcode_viewer.extractor"].extract_toolpath.return_value = (
+            mock_toolpath
+        )
+
+        mock_plotter = MagicMock()
+        mods["pyvista"].Plotter.return_value = mock_plotter
+
+        with (
+            patch.dict("sys.modules", mods),
+            patch("filament_calibrator.gui.Path") as mock_path_cls,
+        ):
+            mock_path_inst = MagicMock()
+            mock_path_inst.read_bytes.return_value = fake_png
+            mock_path_cls.return_value = mock_path_inst
+
+            result = render_gcode_preview("/fake/model.gcode")
+
+        assert result == fake_png
+        mock_plotter.screenshot.assert_called_once()
+        mock_plotter.close.assert_called_once()
+
+    def test_returns_none_on_extraction_error(self) -> None:
+        """When extract_toolpath raises, return None gracefully."""
+        mods = _install_gcode_viewer_stubs()
+        mods["gcode_viewer.extractor"].extract_toolpath.side_effect = (
+            RuntimeError("bad gcode")
+        )
+        with patch.dict("sys.modules", mods):
+            result = render_gcode_preview("/fake/model.gcode")
+            assert result is None
