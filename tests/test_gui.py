@@ -2352,84 +2352,81 @@ class TestTabPrefixes:
 # ---------------------------------------------------------------------------
 
 
-def _install_gcode_viewer_stubs() -> Dict[str, MagicMock]:
-    """Inject mock ``gcode_viewer`` and ``pyvista`` into *sys.modules*.
-
-    Returns a dict of the mock modules keyed by name so tests can
-    configure return values on individual attributes.
-    """
-    mock_pv = MagicMock()
-    mock_gv = MagicMock()
-    mock_extractor = MagicMock()
-    mock_renderer = MagicMock()
-    mock_camera = MagicMock()
-    mock_types = MagicMock()
-    # ColorMode.FEATURE_TYPE must be a usable value
-    mock_types.ColorMode.FEATURE_TYPE = "FEATURE_TYPE"
-    mock_camera.CAMERA_PRESETS = {
-        "isometric": MagicMock(return_value="cam_pos"),
-    }
-    mods: Dict[str, MagicMock] = {
-        "pyvista": mock_pv,
-        "gcode_viewer": mock_gv,
-        "gcode_viewer.extractor": mock_extractor,
-        "gcode_viewer.renderer": mock_renderer,
-        "gcode_viewer.camera": mock_camera,
-        "gcode_viewer.types": mock_types,
-    }
-    return mods
-
-
 class TestRenderGcodePreview:
-    """Tests for the G-code toolpath preview renderer."""
+    """Tests for the G-code toolpath preview subprocess renderer."""
+
+    def test_returns_none_when_frozen(self) -> None:
+        """Frozen bundles can't use sys.executable as Python; return None."""
+        with patch("filament_calibrator.gui._is_frozen", return_value=True):
+            result = render_gcode_preview("/fake/model.gcode")
+            assert result is None
 
     def test_returns_none_when_gcode_viewer_missing(self) -> None:
         """When gcode-viewer is not installed, return None gracefully."""
-        with patch.dict("sys.modules", {
-            "pyvista": None,
-            "gcode_viewer": None,
-            "gcode_viewer.extractor": None,
-            "gcode_viewer.renderer": None,
-            "gcode_viewer.camera": None,
-            "gcode_viewer.types": None,
-        }):
+        with (
+            patch("filament_calibrator.gui._is_frozen", return_value=False),
+            patch.dict("sys.modules", {"gcode_viewer": None}),
+        ):
             result = render_gcode_preview("/fake/model.gcode")
             assert result is None
 
     def test_returns_png_bytes_on_success(self) -> None:
-        """When rendering succeeds, return PNG bytes."""
+        """When the render subprocess succeeds, return PNG bytes."""
         fake_png = b"\x89PNG_FAKE_DATA"
-        mods = _install_gcode_viewer_stubs()
-
-        mock_toolpath = MagicMock()
-        mock_toolpath.total_layers = 10
-        mods["gcode_viewer.extractor"].extract_toolpath.return_value = (
-            mock_toolpath
-        )
-
-        mock_plotter = MagicMock()
-        mods["pyvista"].Plotter.return_value = mock_plotter
+        mock_proc = MagicMock(returncode=0)
 
         with (
-            patch.dict("sys.modules", mods),
+            patch("filament_calibrator.gui._is_frozen", return_value=False),
+            patch.dict("sys.modules", {"gcode_viewer": MagicMock()}),
+            patch("filament_calibrator.gui.subprocess") as mock_sub,
             patch("filament_calibrator.gui.Path") as mock_path_cls,
         ):
+            mock_sub.run.return_value = mock_proc
             mock_path_inst = MagicMock()
+            mock_path_inst.exists.return_value = True
+            mock_path_inst.stat.return_value = MagicMock(st_size=100)
             mock_path_inst.read_bytes.return_value = fake_png
             mock_path_cls.return_value = mock_path_inst
 
             result = render_gcode_preview("/fake/model.gcode")
 
         assert result == fake_png
-        mock_plotter.screenshot.assert_called_once()
-        mock_plotter.close.assert_called_once()
+        mock_sub.run.assert_called_once()
 
-    def test_returns_none_on_extraction_error(self) -> None:
-        """When extract_toolpath raises, return None gracefully."""
-        mods = _install_gcode_viewer_stubs()
-        mods["gcode_viewer.extractor"].extract_toolpath.side_effect = (
-            RuntimeError("bad gcode")
-        )
-        with patch.dict("sys.modules", mods):
+    def test_returns_none_on_subprocess_failure(self) -> None:
+        """When the render subprocess exits non-zero, return None."""
+        mock_proc = MagicMock(returncode=1)
+
+        with (
+            patch("filament_calibrator.gui._is_frozen", return_value=False),
+            patch.dict("sys.modules", {"gcode_viewer": MagicMock()}),
+            patch("filament_calibrator.gui.subprocess") as mock_sub,
+            patch("filament_calibrator.gui.Path") as mock_path_cls,
+        ):
+            mock_sub.run.return_value = mock_proc
+            mock_path_inst = MagicMock()
+            mock_path_inst.exists.return_value = False
+            mock_path_cls.return_value = mock_path_inst
+
             result = render_gcode_preview("/fake/model.gcode")
-            assert result is None
+
+        assert result is None
+
+    def test_returns_none_on_timeout(self) -> None:
+        """When the render subprocess times out, return None."""
+        with (
+            patch("filament_calibrator.gui._is_frozen", return_value=False),
+            patch.dict("sys.modules", {"gcode_viewer": MagicMock()}),
+            patch("filament_calibrator.gui.subprocess") as mock_sub,
+            patch("filament_calibrator.gui.Path") as mock_path_cls,
+        ):
+            mock_sub.run.side_effect = subprocess.TimeoutExpired(
+                cmd="python", timeout=120,
+            )
+            mock_sub.TimeoutExpired = subprocess.TimeoutExpired
+            mock_path_inst = MagicMock()
+            mock_path_cls.return_value = mock_path_inst
+
+            result = render_gcode_preview("/fake/model.gcode")
+
+        assert result is None

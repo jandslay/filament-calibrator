@@ -1323,6 +1323,31 @@ def import_results_from_json(
 # ---------------------------------------------------------------------------
 
 
+#: Inline Python script executed in a subprocess by
+#: :func:`render_gcode_preview`.  VTK's Cocoa backend (macOS) requires
+#: ``NSWindow`` creation on the main thread, but Streamlit runs the app
+#: script on a background thread.  Spawning a fresh process guarantees
+#: that PyVista/VTK gets its own main thread.
+_RENDER_SCRIPT = """\
+import sys
+gcode_path, out_path, w, h = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4])
+import pyvista as pv
+from gcode_viewer.extractor import extract_toolpath
+from gcode_viewer.renderer import build_scene
+from gcode_viewer.camera import CAMERA_PRESETS
+from gcode_viewer.types import ColorMode
+toolpath = extract_toolpath(gcode_path)
+plotter = pv.Plotter(off_screen=True, window_size=[w, h])
+build_scene(plotter, toolpath,
+            layer_range=(0, toolpath.total_layers - 1),
+            show_travel=False, show_bed=True,
+            color_mode=ColorMode.FEATURE_TYPE)
+plotter.camera_position = CAMERA_PRESETS["isometric"](toolpath)
+plotter.screenshot(out_path)
+plotter.close()
+"""
+
+
 def render_gcode_preview(
     gcode_path: str,
     width: int = 440,
@@ -1330,48 +1355,52 @@ def render_gcode_preview(
 ) -> Optional[bytes]:
     """Render a G-code file to a PNG image using *gcode-viewer*.
 
-    Returns the PNG data as ``bytes``, or ``None`` when the
-    *gcode-viewer* package is not installed or rendering fails.
-    """
-    try:
-        import pyvista as pv
+    The rendering runs in a **subprocess** because VTK's Cocoa backend
+    on macOS requires ``NSWindow`` creation on the main thread, but
+    Streamlit executes the app script on a background thread.
 
-        from gcode_viewer.camera import CAMERA_PRESETS
-        from gcode_viewer.extractor import extract_toolpath
-        from gcode_viewer.renderer import build_scene
-        from gcode_viewer.types import ColorMode
+    Returns the PNG data as ``bytes``, or ``None`` when the
+    *gcode-viewer* package is not installed, the render subprocess
+    fails, or we are running inside a PyInstaller frozen bundle
+    (where ``sys.executable`` is the frozen binary, not Python).
+    """
+    if _is_frozen():
+        return None
+
+    try:
+        import gcode_viewer as _gv  # noqa: F401 — availability check
     except ImportError:
         return None
 
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+        tmp_path = tmp.name
+
     try:
-        toolpath = extract_toolpath(gcode_path)
-
-        plotter = pv.Plotter(off_screen=True, window_size=[width, height])
-        build_scene(
-            plotter,
-            toolpath,
-            layer_range=(0, toolpath.total_layers - 1),
-            show_travel=False,
-            show_bed=True,
-            color_mode=ColorMode.FEATURE_TYPE,
+        proc = subprocess.run(
+            [
+                sys.executable, "-c", _RENDER_SCRIPT,
+                gcode_path, tmp_path, str(width), str(height),
+            ],
+            capture_output=True,
+            timeout=120,
         )
-        plotter.camera_position = CAMERA_PRESETS["isometric"](toolpath)
+    except (subprocess.TimeoutExpired, OSError):
+        Path(tmp_path).unlink(missing_ok=True)
+        return None
 
-        # plotter.screenshot() returns an ndarray; write to bytes via
-        # the temporary-file overload and read back.
-        import tempfile
-
-        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
-            tmp_path = tmp.name
-        plotter.screenshot(tmp_path)
-        plotter.close()
-
-        png_path = Path(tmp_path)
+    png_path = Path(tmp_path)
+    if (
+        proc.returncode == 0
+        and png_path.exists()
+        and png_path.stat().st_size > 0
+    ):
         png_data = png_path.read_bytes()
         png_path.unlink(missing_ok=True)
         return png_data
-    except Exception:
-        return None
+    png_path.unlink(missing_ok=True)
+    return None
 
 
 # ---------------------------------------------------------------------------
