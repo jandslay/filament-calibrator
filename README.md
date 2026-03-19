@@ -2,7 +2,7 @@
 
 [![Tests](https://github.com/hyiger/filament-calibrator/actions/workflows/test.yml/badge.svg)](https://github.com/hyiger/filament-calibrator/actions/workflows/test.yml)
 
-> **Hinweis:** Dies ist ein inoffizieller Fork von [hyiger/filament-calibrator](https://github.com/hyiger/filament-calibrator) mit deutscher Benutzeroberfläche.
+> **Hinweis:** Dies ist ein inoffizieller Fork von [hyiger/filament-calibrator](https://github.com/hyiger/filament-calibrator) mit deutscher Benutzeroberfläche. Es sind noch nicht alle Zeilen oder Funktionen übersetzt worden.
 
 CLI-Tool-Suite zur Filamentkalibrierung für Prusa-Drucker — mit vollständig **deutscher GUI**.
 
